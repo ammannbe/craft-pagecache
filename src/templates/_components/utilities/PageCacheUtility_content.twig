@@ -1,0 +1,24 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{#
+/**
+ * Page Cache plugin for Craft CMS
+ *
+ * PageCacheUtility Utility Content
+ *
+ * @author    Benjamin Ammann
+ * @copyright Copyright (c) 2022 Benjamin Ammann
+ * @link      https://github.com/ammannbe
+ * @package   PageCache
+ * @since     0.0.1
+ */
+#}
+
+<h1>PageCacheUtility</h1>
+
+{% set iconUrl = view.getAssetManager().getPublishedUrl('@suhype/pagecache/assetbundles/pagecacheutilityutility/dist', true) ~ '/img/PageCacheUtility-icon.svg' %}
+
+<img src="{{ iconUrl }}" height="64" width="64" />
+
+<p>Your Utility content goes here</p>
+
+<p>{{ someVar }}</p>
