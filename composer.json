@@ -1,5 +1,5 @@
 {
-    "name": "suhype/craft-page-cache",
+    "name": "suhype/craft-pagecache",
     "description": "Simple HTML Page Cache Plugin",
     "type": "craft-plugin",
     "version": "0.0.1",
@@ -11,8 +11,8 @@
         "page cache"
     ],
     "support": {
-        "docs": "https://github.com/craft-page-cache/blob/master/README.md",
-        "issues": "https://github.com/craft-page-cache/issues"
+        "docs": "https://github.com/ammannbe/craft-pagecache/blob/master/README.md",
+        "issues": "https://github.com/ammannbe/craft-pagecache/issues"
     },
     "license": "MIT",
     "authors": [
@@ -22,7 +22,8 @@
         }
     ],
     "require": {
-        "craftcms/cms": "^3.0.0"
+        "php": "^8.0.2|^9.0",
+        "craftcms/cms": "^4.0.0"
     },
     "autoload": {
         "psr-4": {
@@ -31,14 +32,25 @@
     },
     "extra": {
         "name": "Page Cache",
-        "handle": "page-cache",
+        "handle": "pagecache",
         "developer": "Benjamin Ammann",
         "developerUrl": "https://github.com/ammannbe",
-        "documentationUrl": "https://github.com/craft-page-cache/blob/master/README.md",
-        "changelogUrl": "https://raw.githubusercontent.com/craft-page-cache/master/CHANGELOG.md",
+        "documentationUrl": "https://github.com/ammannbe/craft-pagecache/blob/master/README.md",
+        "changelogUrl": "https://raw.githubusercontent.com/ammannbe/craft-pagecache/master/CHANGELOG.md",
         "components": {
             "pageCacheService": "suhype\\pagecache\\services\\PageCacheService"
         },
         "class": "suhype\\pagecache\\PageCache"
+    },
+    "minimum-stability": "dev",
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true,
+            "craftcms/plugin-installer": true
+        }
+    },
+    "prefer-stable": true,
+    "require-dev": {
+        "craftcms/rector": "dev-main"
     }
 }

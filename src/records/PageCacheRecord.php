@@ -1,6 +1,6 @@
 <?php
 /**
- * Page Cache plugin for Craft CMS 3.x
+ * Page Cache plugin for Craft CMS 4.x
  *
  * Simple HTML Page Cache Plugin
  *
@@ -19,6 +19,11 @@ use craft\db\ActiveRecord;
  * @author    Benjamin Ammann
  * @package   PageCache
  * @since     0.0.1
+ *
+ * @property  int $id
+ * @property  int $elementId
+ * @property  int $siteId
+ * @property  string $uri
  */
 class PageCacheRecord extends ActiveRecord
 {
@@ -30,6 +35,6 @@ class PageCacheRecord extends ActiveRecord
      */
     public static function tableName()
     {
-        return '{{%pagecache_pagecacherecord}}';
+        return '{{%pagecache_pagecacherecords}}';
     }
 }

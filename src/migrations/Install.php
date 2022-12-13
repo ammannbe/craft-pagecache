@@ -1,6 +1,6 @@
 <?php
 /**
- * Page Cache plugin for Craft CMS 3.x
+ * Page Cache plugin for Craft CMS 4.x
  *
  * Simple HTML Page Cache Plugin
  *
@@ -45,7 +45,6 @@ class Install extends Migration
             $this->addForeignKeys();
             // Refresh the db schema caches
             Craft::$app->db->schema->refresh();
-            $this->insertDefaultData();
         }
 
         return true;
@@ -72,18 +71,19 @@ class Install extends Migration
     {
         $tablesCreated = false;
 
-        $tableSchema = Craft::$app->db->schema->getTableSchema('{{%pagecache_pagecacherecord}}');
+        $tableSchema = Craft::$app->db->schema->getTableSchema('{{%pagecache_pagecacherecords}}');
         if ($tableSchema === null) {
             $tablesCreated = true;
             $this->createTable(
-                '{{%pagecache_pagecacherecord}}',
+                '{{%pagecache_pagecacherecords}}',
                 [
                     'id' => $this->primaryKey(),
                     'dateCreated' => $this->dateTime()->notNull(),
                     'dateUpdated' => $this->dateTime()->notNull(),
                     'uid' => $this->uid(),
                     'siteId' => $this->integer()->notNull(),
-                    'some_field' => $this->string(255)->notNull()->defaultValue(''),
+                    'elementId' => $this->integer()->notNull(),
+                    'url' => $this->text()->notNull(),
                 ]
             );
         }
@@ -98,21 +98,14 @@ class Install extends Migration
     {
         $this->createIndex(
             $this->db->getIndexName(
-                '{{%pagecache_pagecacherecord}}',
-                'some_field',
+                '{{%pagecache_pagecacherecords}}',
+                'url',
                 true
             ),
-            '{{%pagecache_pagecacherecord}}',
-            'some_field',
+            '{{%pagecache_pagecacherecords}}',
+            'url',
             true
         );
-        // Additional commands depending on the db driver
-        switch ($this->driver) {
-            case DbConfig::DRIVER_MYSQL:
-                break;
-            case DbConfig::DRIVER_PGSQL:
-                break;
-        }
     }
 
     /**
@@ -121,8 +114,8 @@ class Install extends Migration
     protected function addForeignKeys()
     {
         $this->addForeignKey(
-            $this->db->getForeignKeyName('{{%pagecache_pagecacherecord}}', 'siteId'),
-            '{{%pagecache_pagecacherecord}}',
+            $this->db->getForeignKeyName('{{%pagecache_pagecacherecords}}', 'siteId'),
+            '{{%pagecache_pagecacherecords}}',
             'siteId',
             '{{%sites}}',
             'id',
@@ -134,15 +127,8 @@ class Install extends Migration
     /**
      * @return void
      */
-    protected function insertDefaultData()
-    {
-    }
-
-    /**
-     * @return void
-     */
     protected function removeTables()
     {
-        $this->dropTableIfExists('{{%pagecache_pagecacherecord}}');
+        $this->dropTableIfExists('{{%pagecache_pagecacherecords}}');
     }
 }

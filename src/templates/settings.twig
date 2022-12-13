@@ -1,0 +1,100 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{#
+/**
+ * Page Cache plugin for Craft CMS 4.x
+ *
+ * Simple HTML Page Cache Plugin
+ *
+ * @link      https://github.com/ammannbe
+ * @copyright Copyright (c) 2022 Benjamin Ammann
+ */
+#}
+
+{% import "_includes/forms" as forms %}
+
+<p>
+    {{ "Note: You can't make changes, if the config file exists!"|t('pagecache') }}
+</p>
+
+{{ craft.cp.field(forms.lightswitch({
+        id: 'enabled',
+        name: 'enabled',
+        on: settings['enabled'],
+    }), {
+        label: 'Enabled caching'|t('pagecache'),
+        id: 'enabled',
+        name: 'enabled'
+})|raw }}
+
+{{ craft.cp.field(forms.lightswitch({
+        id: 'optimize',
+        name: 'optimize',
+        on: settings['optimize'],
+    }), {
+        label: 'Optimize HTML'|t('pagecache'),
+        id: 'optimize',
+        name: 'optimize'
+})|raw }}
+
+{{ craft.cp.field(forms.lightswitch({
+        id: 'gzip',
+        name: 'gzip',
+        on: settings['gzip'],
+    }), {
+        label: 'Enable gzip compression'|t('pagecache'),
+        id: 'gzip',
+        name: 'gzip'
+})|raw }}
+
+{{ craft.cp.field(forms.lightswitch({
+        id: 'brotli',
+        name: 'brotli',
+        on: settings['brotli'],
+    }), {
+        label: 'Enable brotli compression'|t('pagecache'),
+        info: 'NOTE: the brotli extension must be installed',
+        id: 'brotli',
+        name: 'brotli'
+})|raw }}
+
+{{ forms.editableTable({
+    label: 'Excluded URL\'s'|t('pagecache'),
+    id: 'excludedUrls',
+    name: 'excludedUrls',
+    cols: {
+        siteId: {
+            heading: 'Site'|t('pagecache'),
+            type: "select",
+            options: [{ value: null, label: 'All sites'|t('pagecache') }]
+                |merge(craft.app.sites.getAllSites()
+                |map(site => {
+                    value: site.id,
+                    label: site.name
+                })),
+            thin: true,
+        },
+        path: {
+            heading: "Excluded URL's"|t('pagecache'),
+            type: "singleline"
+        },
+    },
+    rows: settings['excludedUrls'],
+    allowAdd: true,
+    allowReorder: true,
+    allowDelete: true,
+}) }}
+
+{{ craft.cp.field(forms.autosuggest({
+        id: 'cacheFolderPath',
+        name: 'cacheFolderPath',
+        value: settings['cacheFolderPath'],
+        required: true,
+        suggestEnvVars: true,
+        suggestAliases: true,
+    }), {
+        label: 'Cache folder path'|t('pagecache'),
+        id: 'cacheFolderPath',
+        name: 'cacheFolderPath',
+        required: true,
+})|raw }}
+

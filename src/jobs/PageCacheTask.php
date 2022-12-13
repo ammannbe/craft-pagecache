@@ -1,6 +1,6 @@
 <?php
 /**
- * Page Cache plugin for Craft CMS 3.x
+ * Page Cache plugin for Craft CMS 4.x
  *
  * Simple HTML Page Cache Plugin
  *
@@ -13,6 +13,8 @@ namespace suhype\pagecache\jobs;
 use suhype\pagecache\PageCache;
 
 use Craft;
+use GuzzleHttp;
+use craft\base\Element;
 use craft\queue\BaseJob;
 
 /**
@@ -28,7 +30,17 @@ class PageCacheTask extends BaseJob
     /**
      * @var string
      */
-    public $someAttribute = 'Some Default';
+    public string $elementId;
+
+    /**
+     * @var bool
+     */
+    public bool $deleteOnly = false;
+
+    /**
+     * @var ?string
+     */
+    public ?string $query = null;
 
     // Public Methods
     // =========================================================================
@@ -36,9 +48,24 @@ class PageCacheTask extends BaseJob
     /**
      * @inheritdoc
      */
-    public function execute($queue)
+    public function execute($queue): void
     {
-        // Do work here
+        /** @var Element $element */
+        $element = Craft::$app->elements->getElementById($this->elementId);
+
+        PageCache::$plugin->pageCacheService->deletePageCache($element, $this->query);
+
+        if (!$this->deleteOnly) {
+            $client = new GuzzleHttp\Client();
+            $url = $element->getUrl();
+
+            if ($this->query) {
+                $url = $url . '?' . $this->query;
+            }
+
+            $client->get($url);
+            
+        }
     }
 
     // Protected Methods
@@ -49,6 +76,6 @@ class PageCacheTask extends BaseJob
      */
     protected function defaultDescription(): string
     {
-        return Craft::t('page-cache', 'PageCacheTask');
+        return Craft::t('pagecache', 'Process page cache');
     }
 }

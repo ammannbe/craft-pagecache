@@ -1,0 +1,29 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    [...] # Other config/rewrite rules
+
+    # PageCache rewrites
+    AddEncoding brotli .br
+
+    RewriteCond %{REQUEST_METHOD} =GET
+    RewriteCond %{HTTP:Accept-encoding} brotli
+    RewriteCond %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/\@%{QUERY_STRING}/index.html.br -s
+    RewriteRule .* %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/\@%{QUERY_STRING}/index.html.br [L]
+
+    RewriteCond %{REQUEST_METHOD} =GET
+    RewriteCond %{HTTP:Accept-encoding} brotli
+    RewriteCond %{QUERY_STRING} ^$
+    RewriteCond %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/index.html.br -s
+    RewriteRule .* %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/index.html.br [L]
+
+    RewriteRule \.html\.br$ - [T=text/html,E=no-brotli:1]
+
+    [...] # Normal page cache rewrites
+
+    # Send would-be 404 requests to Craft
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/(favicon\.ico|apple-touch-icon.*\.png)$ [NC]
+    RewriteRule (.+) index.php?p=$1 [QSA,L]
+</IfModule>
