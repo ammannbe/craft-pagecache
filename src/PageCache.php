@@ -105,7 +105,8 @@ class PageCache extends Plugin
                 // Check if the the old slug is not equal the new one
                 $element = Entry::find()->id($event->element->id)->one();
                 if ($event->element->slug !== $element->slug) {
-                    $this->pageCacheService->deleteAllPageCaches($element);
+                    $elements = $this->pageCacheService->getRelatedElements($element);
+                    $this->pageCacheService->deleteAllPageCaches([$element, ...$elements]);
                 }
             }
         );
@@ -114,21 +115,32 @@ class PageCache extends Plugin
             Elements::class,
             Elements::EVENT_AFTER_SAVE_ELEMENT,
             function (Event $event) {
-                if (!$event->element->uri || ElementHelper::isDraftOrRevision($event->element)) {
-                    return;
-                }
-
                 $activeStates = [
                     Entry::STATUS_LIVE,
                     Element::STATUS_ENABLED,
                 ];
 
-                if (!in_array($event->element->getStatus(), $activeStates)) {
-                    $this->pageCacheService->deleteAllPageCaches($event->element);
-                    return;
+                $elements = $this->pageCacheService->getRelatedElements($event->element);
+                $elements[$event->element->id] = $event->element;
+
+                $toDelete = [];
+                $toRecreate = [];
+
+                foreach ($elements as $element) {
+                    if (!$element->uri || ElementHelper::isDraftOrRevision($element) || $element->propagating || $element->resaving) {
+                        continue;
+                    }
+
+                    if (!in_array($element->getStatus(), $activeStates)) {
+                        $toDelete[$element->id] = $element;
+                        continue;
+                    }
+
+                    $toRecreate[$element->id] = $element;
                 }
 
-                $this->pageCacheService->recreatePageCaches($event->element);
+                $this->pageCacheService->deleteAllPageCaches($toDelete);
+                $this->pageCacheService->recreatePageCaches($toRecreate);
             }
         );
 
@@ -140,7 +152,7 @@ class PageCache extends Plugin
                     return;
                 }
 
-                $this->pageCacheService->deletePageCache($event->element);
+                $this->pageCacheService->deleteAllPageCaches($event->element);
             }
         );
     }

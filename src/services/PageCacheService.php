@@ -16,6 +16,7 @@ use Craft;
 use craft\base\Element;
 use craft\helpers\Queue;
 use craft\base\Component;
+use craft\elements\Entry;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 use suhype\pagecache\jobs\PageCacheTask;
@@ -196,6 +197,41 @@ class PageCacheService extends Component
             ->all();
     }
 
+    public function getRelatedElements(Element $element)
+    {
+        $entries = [];
+        foreach (Entry::find()->relatedTo($element)->all() as $element) {
+            $entries[$element->id] = $element;
+        }
+
+        if (class_exists('\benf\neo\elements\Block')) {
+            $neo = \benf\neo\elements\Block::find()->relatedTo($element)->all();
+            foreach($neo as $el) {
+                $owner = $el->getOwner();
+                if (!$owner->uri) { continue; }
+                $entries[$owner->id] = $owner;
+            }
+        }
+
+        if (class_exists('\verbb\supertable\elements\SuperTableBlockElement')) {
+            $supertable = \verbb\supertable\elements\SuperTableBlockElement::find()->relatedTo($element)->all();
+            foreach($supertable as $el) {
+                $owner = $el->getOwner();
+                if (!$owner->uri) { continue; }
+                $entries[$owner->id] = $owner;
+            }
+        }
+
+        $matrix = \craft\elements\MatrixBlock::find()->relatedTo($element)->all();
+        foreach($matrix as $el) {
+            $owner = $el->getOwner();
+            if (!$owner->uri) { continue; }
+            $entries[$owner->id] = $owner;
+        }
+
+        return $entries;
+    }
+
     public function createPageCache(Element $element, string $query = null, string $html)
     {
         if (!$this->shouldCachePage($element, $query)) {
@@ -215,19 +251,27 @@ class PageCacheService extends Component
         }
     }
 
-    public function recreatePageCaches(Element $element, bool $deleteQuery = false)
+    public function recreatePageCaches(Element|array $element, bool $deleteQuery = false)
     {
-        Queue::push(new PageCacheTask(['elementId' => $element->id]));
-
-        $records = $this->getPageCacheQueryRecords($element);
-        foreach ($records as $record) {
-            $query = explode('?', $record->url)[1];
-            Queue::push(new PageCacheTask([
-                'elementId' => $element->id,
-                'query' => $query,
-                'deleteOnly' => $deleteQuery
-            ]));
+        if (empty($element)) {
+            return;
         }
+
+        $elements = [$element];
+        if (is_array($element)) {
+            $elements = $element;
+        }
+
+        unset($element);
+
+        $elementIds = [];
+        foreach ($elements as $element) {
+            $elementIds[] = $element->id;
+        }
+        Queue::push(new PageCacheTask([
+            'elementIds' => $elementIds,
+            'deleteQuery' => $deleteQuery,
+        ]));
     }
 
     public function createPageCacheFile(Element $element, string $query = null, string $html): void
@@ -326,14 +370,23 @@ class PageCacheService extends Component
         }
     }
 
-    public function deleteAllPageCaches(Element $element)
+    public function deleteAllPageCaches(Element|array $element)
     {
-        $this->deletePageCache($element);
+        $elements = [$element];
+        if (is_array($element)) {
+            $elements = $element;
+        }
 
-        $records = $this->getPageCacheQueryRecords($element);
-        foreach ($records as $record) {
-            $query = explode('?', $record->url)[1];
-            $this->deletePageCache($element, $query);
+        unset($element);
+
+        foreach ($elements as $element) {
+            $this->deletePageCache($element);
+    
+            $records = $this->getPageCacheQueryRecords($element);
+            foreach ($records as $record) {
+                $query = explode('?', $record->url)[1];
+                $this->deletePageCache($element, $query);
+            }
         }
     }
 

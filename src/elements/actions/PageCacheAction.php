@@ -70,21 +70,23 @@ JS, [static::class]);
      */
     public function performAction(ElementQueryInterface $query): bool
     {
+        $entries = [];
         foreach ($query->all() as $element) {
             if (!$element->uri) {
                 continue;
             }
 
-            if ($this->cache == self::ACTION_DELETE) {
-                PageCache::$plugin->pageCacheService->deleteAllPageCaches($element);
-            } elseif ($this->cache == self::ACTION_RECREATE_AND_DELETE_QUERY) {
-                PageCache::$plugin->pageCacheService->recreatePageCaches($element, true);
-            } else {
-                PageCache::$plugin->pageCacheService->recreatePageCaches($element);
-            }
-
+            $entries[$element->id] = $element;
         }
-        
+
+        if ($this->cache == self::ACTION_DELETE) {
+            PageCache::$plugin->pageCacheService->deleteAllPageCaches($entries);
+        } elseif ($this->cache == self::ACTION_RECREATE_AND_DELETE_QUERY) {
+            PageCache::$plugin->pageCacheService->recreatePageCaches($entries, true);
+        } else {
+            PageCache::$plugin->pageCacheService->recreatePageCaches($entries);
+        }
+
         $this->setMessage(\Craft::t('pagecache', 'Process page cache'));
         return true;
     }

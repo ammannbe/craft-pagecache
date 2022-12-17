@@ -28,19 +28,14 @@ class PageCacheTask extends BaseJob
     // =========================================================================
 
     /**
-     * @var string
+     * @var array
      */
-    public string $elementId;
+    public array $elementIds;
 
     /**
      * @var bool
      */
-    public bool $deleteOnly = false;
-
-    /**
-     * @var ?string
-     */
-    public ?string $query = null;
+    public bool $deleteQuery = false;
 
     // Public Methods
     // =========================================================================
@@ -50,22 +45,60 @@ class PageCacheTask extends BaseJob
      */
     public function execute($queue): void
     {
-        /** @var Element $element */
-        $element = Craft::$app->elements->getElementById($this->elementId);
+        $client = new GuzzleHttp\Client();
+        $total = 0;
 
-        PageCache::$plugin->pageCacheService->deletePageCache($element, $this->query);
+        $elements = [];
+        foreach ($this->elementIds as $elementId) {
+            /** @var Element $element */
+            $element = Craft::$app->elements->getElementById($elementId);
+            $records = PageCache::$plugin->pageCacheService->getPageCacheQueryRecords($element);
 
-        if (!$this->deleteOnly) {
-            $client = new GuzzleHttp\Client();
-            $url = $element->getUrl();
+            $elements[] = [
+                'element' => $element,
+                'records' => $records,
+            ];
 
-            if ($this->query) {
-                $url = $url . '?' . $this->query;
-            }
-
-            $client->get($url);
-            
+            $total += count($records) + 1;
         }
+
+        $i = 1;
+        foreach ($elements as $el) {
+            $element = $el['element'];
+            $records = $el['records'];
+
+            $this->setProgress(
+                $queue,
+                $i / $total,
+                \Craft::t('app', '{step, number} of {total, number}', [
+                    'step' => $i + 1,
+                    'total' => $total,
+                ])
+            );
+            $i++;
+
+            PageCache::$plugin->pageCacheService->deleteAllPageCaches($element);
+
+            $client->getAsync($element->getUrl());
+
+            if (!$this->deleteQuery) {
+                foreach ($records as $record) {
+                    $this->setProgress(
+                        $queue,
+                        $i / $total,
+                        \Craft::t('app', '{step, number} of {total, number}', [
+                            'step' => $i + 1,
+                            'total' => $total,
+                        ])
+                    );
+                    $i++;
+
+                    $query = explode('?', $record->url)[1];
+                    $client->getAsync($element->getUrl() . '?' . $query);
+                }
+            }
+        }
+
     }
 
     // Protected Methods
