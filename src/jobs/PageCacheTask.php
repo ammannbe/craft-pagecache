@@ -51,7 +51,8 @@ class PageCacheTask extends BaseJob
         $elements = [];
         foreach ($this->elementIds as $elementId) {
             /** @var Element $element */
-            $element = Craft::$app->elements->getElementById($elementId);
+            $element = Craft::$app->elements->getElementById($elementId['id']);
+            $element->siteId = $elementId['siteId'];
             $records = PageCache::$plugin->pageCacheService->getPageCacheQueryRecords($element);
 
             $elements[] = [
@@ -64,6 +65,7 @@ class PageCacheTask extends BaseJob
 
         $i = 1;
         foreach ($elements as $el) {
+            /** @var Element $element */
             $element = $el['element'];
             $records = $el['records'];
 
@@ -78,8 +80,8 @@ class PageCacheTask extends BaseJob
             $i++;
 
             PageCache::$plugin->pageCacheService->deleteAllPageCaches($element);
-
-            $client->getAsync($element->getUrl());
+            $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
+            $client->getAsync($url);
 
             if (!$this->deleteQuery) {
                 foreach ($records as $record) {
@@ -94,7 +96,7 @@ class PageCacheTask extends BaseJob
                     $i++;
 
                     $query = explode('?', $record->url)[1];
-                    $client->getAsync($element->getUrl() . '?' . $query);
+                    $client->getAsync($url . '?' . $query);
                 }
             }
         }

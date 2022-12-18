@@ -10,10 +10,7 @@
 
 namespace suhype\pagecache\migrations;
 
-use suhype\pagecache\PageCache;
-
 use Craft;
-use craft\config\DbConfig;
 use craft\db\Migration;
 
 /**
@@ -41,7 +38,6 @@ class Install extends Migration
     {
         $this->driver = Craft::$app->getConfig()->getDb()->driver;
         if ($this->createTables()) {
-            $this->createIndexes();
             $this->addForeignKeys();
             // Refresh the db schema caches
             Craft::$app->db->schema->refresh();
@@ -78,34 +74,17 @@ class Install extends Migration
                 '{{%pagecache_pagecacherecords}}',
                 [
                     'id' => $this->primaryKey(),
+                    'uid' => $this->uid(),
+                    'elementId' => $this->integer()->notNull(),
+                    'siteId' => $this->integer()->notNull(),
+                    'url' => $this->text()->notNull(),
                     'dateCreated' => $this->dateTime()->notNull(),
                     'dateUpdated' => $this->dateTime()->notNull(),
-                    'uid' => $this->uid(),
-                    'siteId' => $this->integer()->notNull(),
-                    'elementId' => $this->integer()->notNull(),
-                    'url' => $this->text()->notNull(),
                 ]
             );
         }
 
         return $tablesCreated;
-    }
-
-    /**
-     * @return void
-     */
-    protected function createIndexes()
-    {
-        $this->createIndex(
-            $this->db->getIndexName(
-                '{{%pagecache_pagecacherecords}}',
-                'url',
-                true
-            ),
-            '{{%pagecache_pagecacherecords}}',
-            'url',
-            true
-        );
     }
 
     /**

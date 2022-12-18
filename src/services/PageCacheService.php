@@ -266,7 +266,11 @@ class PageCacheService extends Component
 
         $elementIds = [];
         foreach ($elements as $element) {
-            $elementIds[] = $element->id;
+            /** @var Element $element */
+            $elementIds[] = [
+                'id' => $element->id,
+                'siteId' => $element->siteId,
+            ];
         }
         Queue::push(new PageCacheTask([
             'elementIds' => $elementIds,
