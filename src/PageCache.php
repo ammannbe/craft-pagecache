@@ -104,7 +104,7 @@ class PageCache extends Plugin
 
                 // Check if the the old slug is not equal the new one
                 $element = Entry::find()->id($event->element->id)->one();
-                if ($event->element->slug !== $element->slug) {
+                if ($element && $event->element->slug !== $element->slug) {
                     $elements = $this->pageCacheService->getRelatedElements($element);
                     $this->pageCacheService->deleteAllPageCaches([$element, ...$elements]);
                 }
