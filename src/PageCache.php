@@ -54,17 +54,17 @@ class PageCache extends Plugin
     /**
      * @var string
      */
-    public string $schemaVersion = '0.0.1';
+    public $schemaVersion = '0.0.1';
 
     /**
      * @var bool
      */
-    public bool $hasCpSettings = true;
+    public $hasCpSettings = true;
 
     /**
      * @var bool
      */
-    public bool $hasCpSection = false;
+    public $hasCpSection = false;
 
     // Protected Methods
     // =========================================================================
