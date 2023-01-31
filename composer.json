@@ -49,8 +49,5 @@
             "craftcms/plugin-installer": true
         }
     },
-    "prefer-stable": true,
-    "require-dev": {
-        "craftcms/rector": "dev-main"
-    }
+    "prefer-stable": true
 }
