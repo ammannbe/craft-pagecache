@@ -2,7 +2,7 @@
     "name": "suhype/craft-pagecache",
     "description": "Simple HTML Page Cache Plugin",
     "type": "craft-plugin",
-    "version": "0.0.1",
+    "version": "0.0.1-beta.1",
     "keywords": [
         "craft",
         "cms",
