@@ -24,7 +24,8 @@ class Settings extends Model
     public function rules(): array
     {
         return [
-            [['excludedUrls', 'cacheFolderPath'], 'default', 'value' => []],
+            ['excludedUrls', 'default', 'value' => []],
+            ['cacheFolderPath', 'default', 'value' => '@webroot/pagecache'],
             [['enabled', 'optimize', 'gzip', 'brotli'], 'default', 'value' => true],
         ];
     }

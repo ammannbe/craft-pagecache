@@ -251,7 +251,12 @@ class PageCacheService extends Component
         }
     }
 
-    public function recreatePageCaches(Element|array $element, bool $deleteQuery = false)
+    /**
+     * Recreate page caches of element(s)
+     * 
+     * @param array<Element>|Element $element
+     */
+    public function recreatePageCaches($element, bool $deleteQuery = false)
     {
         if (empty($element)) {
             return;
@@ -374,7 +379,12 @@ class PageCacheService extends Component
         }
     }
 
-    public function deleteAllPageCaches(Element|array $element)
+    /**
+     * Delete page caches of element(s)
+     * 
+     * @param array<Element>|Element $element
+     */
+    public function deleteAllPageCaches($element)
     {
         $elements = [$element];
         if (is_array($element)) {

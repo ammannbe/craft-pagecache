@@ -248,6 +248,10 @@ class PageCache extends Plugin
 
                     $element = Craft::$app->getUrlManager()->getMatchedElement();
 
+                    if (!$element) { 
+                        return;
+                    }
+
                     $this->pageCacheService->createPageCache($element, Craft::$app->request->getQueryStringWithoutPath(), $event->output);
                 }
             );
