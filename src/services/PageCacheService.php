@@ -67,8 +67,8 @@ class PageCacheService extends Component
         $url = trim($this->parseUrl($element, $query), '/');
         $url = str_replace('?', '/@', $url);
         $baseUrl = trim($element->getSite()->getBaseUrl(), '/');
-        $baseUrl = trim($baseUrl, 'https://');
-        $baseUrl = trim($baseUrl, 'http://');
+        $baseUrl = str_replace('https://', '', $baseUrl);
+        $baseUrl = str_replace('http://', '', $baseUrl);
         $baseUrl = explode(':', $baseUrl)[0];
 
         if ($url === Element::HOMEPAGE_URI) {
