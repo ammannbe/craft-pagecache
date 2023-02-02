@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.0.1-beta.5 - 2023-02-02
+
+### Fixed
+
+- Fixed type error while saving settings: Settings::$excludedUrls
+
 ## 0.0.1-beta.4 - 2023-02-01
 
 ### Fixed

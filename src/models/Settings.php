@@ -18,7 +18,7 @@ class Settings extends Model
     public bool $optimize = true;
     public bool $gzip = true;
     public bool $brotli = true;
-    public array $excludedUrls = [];
+    public $excludedUrls = [];
     public string $cacheFolderPath = '@webroot/pagecache';
 
     public function rules(): array
