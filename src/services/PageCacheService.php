@@ -225,7 +225,9 @@ class PageCacheService extends Component
         $matrix = \craft\elements\MatrixBlock::find()->relatedTo($element)->all();
         foreach($matrix as $el) {
             $owner = $el->getOwner();
-            if (!$owner->uri && $owner->owner->uri) { $owner = $owner->owner; }
+            try {
+                if (!$owner->uri && $owner->getOwner()?->uri) { $owner = $owner->owner; }
+            } catch (\Exception $e) { }
             if (!$owner->uri) { continue; }
             $entries[$owner->id] = $owner;
         }
