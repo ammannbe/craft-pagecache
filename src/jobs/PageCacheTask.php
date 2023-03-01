@@ -81,6 +81,7 @@ class PageCacheTask extends BaseJob
 
             PageCache::$plugin->pageCacheService->deleteAllPageCaches($element);
             $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
+            $url = str_replace(Element::HOMEPAGE_URI, '', $url);
             $client->getAsync($url);
 
             if (!$this->deleteQuery) {
