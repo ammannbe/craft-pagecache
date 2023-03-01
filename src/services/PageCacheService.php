@@ -91,6 +91,17 @@ class PageCacheService extends Component
         return true;
     }
 
+    public function shouldCacheHtml(string $html): bool
+    {
+        $html = stripslashes($html);
+
+        if (str_contains($html, 'assets/generate-transform')) {
+            return false;
+        }
+
+        return true;
+    }
+
     private function isPathExcluded(Element $element, string $query = null): bool
     {
         foreach ($this->excludedUrls as $excludedUrl) {
@@ -237,7 +248,7 @@ class PageCacheService extends Component
 
     public function createPageCache(Element $element, string $query = null, string $html)
     {
-        if (!$this->shouldCachePage($element, $query)) {
+        if (!$this->shouldCachePage($element, $query, $html) || !$this->shouldCacheHtml($html)) {
             $this->deletePageCache($element, $query);
             return false;
         }
