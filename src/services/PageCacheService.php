@@ -55,9 +55,7 @@ class PageCacheService extends Component
     {
         $url = trim(implode('?', [$element->uri, $query]), '?');
 
-        if ($url === Element::HOMEPAGE_URI) {
-            return '/';
-        }
+        $url = str_replace(Element::HOMEPAGE_URI, '', $url);
 
         return '/' . $url;
     }
@@ -465,6 +463,7 @@ class PageCacheService extends Component
         }
 
         if (!$this->pageCacheFileExists($element, $query)) {
+            $this->deletePageCache($element, $query);
             return false;
         }
 
