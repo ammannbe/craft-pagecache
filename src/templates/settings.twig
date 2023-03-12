@@ -57,6 +57,21 @@
         name: 'brotli'
 })|raw }}
 
+{{ craft.cp.field(forms.select({
+        id: 'globalSaveAction',
+        name: 'globalSaveAction',
+        options: [
+            { value: 'recreate', label: 'Renew cache'|t('pagecache') },
+            { value: 'recreateAndDeleteQuery1', label: 'Recreate cache (delete query)'|t('pagecache') },
+            { value: 'delete', label: 'Delete cache'|t('pagecache') },
+        ],
+        value: settings['globalSaveAction'],
+    }), {
+        label: 'When globals are saved'|t('pagecache'),
+        id: 'globalSaveAction',
+        name: 'globalSaveAction'
+})|raw }}
+
 {{ forms.editableTable({
     label: 'Excluded URL\'s'|t('pagecache'),
     id: 'excludedUrls',

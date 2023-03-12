@@ -267,6 +267,7 @@ class PageCacheService extends Component
      * Recreate page caches of element(s)
      * 
      * @param array<Element>|Element $element
+     * @param bool $deleteQuery
      */
     public function recreatePageCaches($element, bool $deleteQuery = false)
     {
@@ -286,6 +287,29 @@ class PageCacheService extends Component
             /** @var Element $element */
             $elementIds[] = [
                 'id' => $element->id,
+                'siteId' => $element->siteId,
+            ];
+        }
+        Queue::push(new PageCacheTask([
+            'elementIds' => $elementIds,
+            'deleteQuery' => $deleteQuery,
+        ]));
+    }
+
+    /**
+     * Recreate all existing page caches
+     *
+     * @param bool $deleteQuery
+     */
+    public function recreateAllPageCaches(bool $deleteQuery = false)
+    {
+        $elements = PageCacheRecord::find()->all();
+
+        $elementIds = [];
+        foreach ($elements as $element) {
+            /** @var Element $element */
+            $elementIds[] = [
+                'id' => $element->elementId,
                 'siteId' => $element->siteId,
             ];
         }
@@ -393,11 +417,15 @@ class PageCacheService extends Component
 
     /**
      * Delete page caches of element(s)
-     * 
-     * @param array<Element>|Element $element
+     *
+     * @param array<Element>|Element|'all' $element
      */
     public function deleteAllPageCaches($element)
     {
+        if ($element === 'all') {
+            $element = PageCacheRecord::find()->all();
+        }
+
         $elements = [$element];
         if (is_array($element)) {
             $elements = $element;
