@@ -26,9 +26,11 @@ use craft\elements\GlobalSet;
 use craft\events\PluginEvent;
 use craft\events\TemplateEvent;
 use craft\helpers\ElementHelper;
+use craft\web\twig\variables\CraftVariable;
 use craft\events\RegisterElementActionsEvent;
 use craft\console\Application as ConsoleApplication;
 use suhype\pagecache\elements\actions\PageCacheAction;
+use suhype\pagecache\variables\PageCacheVariable;
 
 /**
  * Class PageCache
@@ -93,6 +95,19 @@ class PageCache extends Plugin
                 if ($event->plugin === $this) {
                     $this->pageCacheService->deleteCacheFolder();
                 }
+            }
+        );
+    }
+
+    private function _registerVariableEvent()
+    {
+        Event::on(
+            CraftVariable::class,
+            CraftVariable::EVENT_INIT,
+            function (Event $event) {
+                /** @var CraftVariable $variable */
+                $variable = $event->sender;
+                $variable->set('pagecache', PageCacheVariable::class);
             }
         );
     }
@@ -261,6 +276,7 @@ class PageCache extends Plugin
         }
 
         $this->_registerInstallEvents();
+        $this->_registerVariableEvent();
         $this->_registerElementEvents();
         $this->_registerActionEvents();
 
