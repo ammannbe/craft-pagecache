@@ -11,6 +11,7 @@
 namespace suhype\pagecache\models;
 
 use craft\base\Model;
+use suhype\pagecache\PageCache;
 
 class Settings extends Model
 {
@@ -18,6 +19,7 @@ class Settings extends Model
     public bool $optimize = true;
     public bool $gzip = true;
     public bool $brotli = true;
+    public string $globalSaveAction = PageCache::GLOBAL_ACTION_RECREATE;
     public $excludedUrls = [];
     public string $cacheFolderPath = '@webroot/pagecache';
 
@@ -27,6 +29,7 @@ class Settings extends Model
             ['excludedUrls', 'default', 'value' => []],
             ['cacheFolderPath', 'default', 'value' => '@webroot/pagecache'],
             [['enabled', 'optimize', 'gzip', 'brotli'], 'default', 'value' => true],
+            ['globalSaveAction', 'default', 'value' => PageCache::GLOBAL_ACTION_RECREATE],
         ];
     }
 }

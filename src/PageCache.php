@@ -22,6 +22,7 @@ use craft\elements\Entry;
 use craft\web\Application;
 use craft\services\Plugins;
 use craft\services\Elements;
+use craft\elements\GlobalSet;
 use craft\events\PluginEvent;
 use craft\events\TemplateEvent;
 use craft\helpers\ElementHelper;
@@ -66,6 +67,10 @@ class PageCache extends Plugin
      */
     public $hasCpSection = false;
 
+    public const GLOBAL_ACTION_RECREATE = 'recreate';
+    public const GLOBAL_ACTION_RECREATE_AND_DELETE_QUERY = 'recreateAndDeleteQuery';
+    public const GLOBAL_ACTION_DELETE = 'delete';
+
     // Protected Methods
     // =========================================================================
 
@@ -107,6 +112,26 @@ class PageCache extends Plugin
                 if ($element && $event->element->slug !== $element->slug) {
                     $elements = $this->pageCacheService->getRelatedElements($element);
                     $this->pageCacheService->deleteAllPageCaches([$element, ...$elements]);
+                }
+            }
+        );
+
+        Event::on(
+            GlobalSet::class,
+            GlobalSet::EVENT_AFTER_SAVE,
+            function (Event $event) {
+                switch (PageCache::$plugin->settings->globalSaveAction) {
+                    case PageCache::GLOBAL_ACTION_DELETE:
+                        $this->pageCacheService->deleteAllPageCaches('all');
+                        break;
+
+                    case PageCache::GLOBAL_ACTION_RECREATE_AND_DELETE_QUERY:
+                        $this->pageCacheService->recreateAllPageCaches(true);
+                        break;
+
+                    default:
+                        $this->pageCacheService->recreateAllPageCaches(false);
+                        break;
                 }
             }
         );
