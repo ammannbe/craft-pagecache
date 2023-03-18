@@ -126,7 +126,7 @@ class PageCache extends Plugin
                 $element = Entry::find()->id($event->element->id)->one();
                 if ($element && $event->element->slug !== $element->slug) {
                     $elements = $this->pageCacheService->getRelatedElements($element);
-                    $this->pageCacheService->deleteAllPageCaches([$element, ...$elements]);
+                    $this->pageCacheService->deletePageCacheWithQuery([$element, ...$elements]);
                 }
             }
         );
@@ -137,15 +137,15 @@ class PageCache extends Plugin
             function (Event $event) {
                 switch (PageCache::$plugin->settings->globalSaveAction) {
                     case PageCache::GLOBAL_ACTION_DELETE:
-                        $this->pageCacheService->deleteAllPageCaches('all');
+                        $this->pageCacheService->deleteAllPageCaches($event->sender->siteId);
                         break;
 
                     case PageCache::GLOBAL_ACTION_RECREATE_AND_DELETE_QUERY:
-                        $this->pageCacheService->recreateAllPageCaches(true);
+                        $this->pageCacheService->recreateAllPageCaches(true, $event->sender->siteId);
                         break;
 
                     default:
-                        $this->pageCacheService->recreateAllPageCaches(false);
+                        $this->pageCacheService->recreateAllPageCaches(false, $event->sender->siteId);
                         break;
                 }
             }
@@ -179,7 +179,7 @@ class PageCache extends Plugin
                     $toRecreate[$element->id] = $element;
                 }
 
-                $this->pageCacheService->deleteAllPageCaches($toDelete);
+                $this->pageCacheService->deletePageCacheWithQuery($toDelete);
                 $this->pageCacheService->recreatePageCaches($toRecreate);
             }
         );
@@ -192,7 +192,7 @@ class PageCache extends Plugin
                     return;
                 }
 
-                $this->pageCacheService->deleteAllPageCaches($event->element);
+                $this->pageCacheService->deletePageCacheWithQuery($event->element);
             }
         );
     }

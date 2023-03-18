@@ -80,7 +80,7 @@ JS, [static::class]);
         }
 
         if ($this->cache == self::ACTION_DELETE) {
-            PageCache::$plugin->pageCacheService->deleteAllPageCaches($entries);
+            PageCache::$plugin->pageCacheService->deletePageCacheWithQuery($entries);
         } elseif ($this->cache == self::ACTION_RECREATE_AND_DELETE_QUERY) {
             PageCache::$plugin->pageCacheService->recreatePageCaches($entries, true);
         } else {

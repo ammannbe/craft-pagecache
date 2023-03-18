@@ -301,9 +301,13 @@ class PageCacheService extends Component
      *
      * @param bool $deleteQuery
      */
-    public function recreateAllPageCaches(bool $deleteQuery = false)
+    public function recreateAllPageCaches(bool $deleteQuery = false, $siteId = null)
     {
-        $elements = PageCacheRecord::find()->all();
+        if ($siteId !== null) {
+            $elements = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
+        } else {
+            $elements = PageCacheRecord::find()->all();
+        }
 
         $elementIds = [];
         foreach ($elements as $element) {
@@ -416,16 +420,12 @@ class PageCacheService extends Component
     }
 
     /**
-     * Delete page caches of element(s)
+     * Delete the page and query cache of the element(s)
      *
-     * @param array<Element>|Element|'all' $element
+     * @param array<Element>|Element $element
      */
-    public function deleteAllPageCaches($element)
+    public function deletePageCacheWithQuery($element)
     {
-        if ($element === 'all') {
-            $element = PageCacheRecord::find()->all();
-        }
-
         $elements = [$element];
         if (is_array($element)) {
             $elements = $element;
@@ -442,6 +442,15 @@ class PageCacheService extends Component
                 $this->deletePageCache($element, $query);
             }
         }
+    }
+
+    /**
+     * Delete all existing page caches
+     */
+    public function deleteAllPageCaches(int $siteId)
+    {
+        $elements = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
+        $this->deletePageCacheWithQuery($elements);
     }
 
     public function renamePageCache(Element $oldElement, Element $newElement, string $query = null)
