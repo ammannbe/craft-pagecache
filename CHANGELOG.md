@@ -8,8 +8,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ### Fixed
 
-- Don't cache pages with active assets transforms
-- Remove \_\_home\_\_ from URIs
+- Refactor recreate/delete cache when globals change
 
 ## 1.0.0-beta.6 - 2023-03-018
 
