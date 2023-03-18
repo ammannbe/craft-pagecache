@@ -51,8 +51,7 @@ class PageCacheTask extends BaseJob
         $elements = [];
         foreach ($this->elementIds as $elementId) {
             /** @var Element $element */
-            $element = Craft::$app->elements->getElementById($elementId['id']);
-            $element->siteId = $elementId['siteId'];
+            $element = Craft::$app->elements->getElementById($elementId['id'], null, $elementId['siteId']);
             $records = PageCache::$plugin->pageCacheService->getPageCacheQueryRecords($element);
 
             $elements[] = [
@@ -79,7 +78,7 @@ class PageCacheTask extends BaseJob
             );
             $i++;
 
-            PageCache::$plugin->pageCacheService->deleteAllPageCaches($element);
+            PageCache::$plugin->pageCacheService->deletePageCacheWithQuery($element);
             $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
             $url = str_replace(Element::HOMEPAGE_URI, '', $url);
             $client->getAsync($url);
