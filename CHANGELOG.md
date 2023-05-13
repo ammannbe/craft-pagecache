@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ### Fixed
 
+- Bump new release 0.1.0 (Craft CMS 3.x)
+
+## 0.0.1 - 2023-05-13
+
+### Fixed
+
 - cleanup pagecache.php
 - prevent loading jquery when using PageCacheVariable
 - bump to release 0.0.1
