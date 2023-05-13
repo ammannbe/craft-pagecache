@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.0.1 - 2023-05-13
+
+### Fixed
+
+- cleanup pagecache.php
+- prevent loading jquery when using PageCacheVariable
+- bump to release 0.0.1
+- Updated README.md
+
 ## 0.0.1-beta.11 - 2023-03-18
 
 ### Fixed
