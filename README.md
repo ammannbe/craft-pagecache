@@ -49,6 +49,12 @@ Go to _Settings_ → _Page Cache_ to setup the basic configuration options:
 - As soon as a user visits a page, it got's cached.
 - Optional: go to _Entries_, mark all cachable entries (→ entries with URL's), and Choose _Create/Renew cache_
 
+## Delete Page Caches
+
+- Go to _Utilities_ → _Caches_
+- Select _Page Cache_
+- Click on _Clear caches_
+
 ## Page Cache Roadmap
 
 Some things to do, and ideas for potential features:

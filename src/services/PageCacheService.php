@@ -447,10 +447,15 @@ class PageCacheService extends Component
     /**
      * Delete all existing page caches
      */
-    public function deleteAllPageCaches(int $siteId)
+    public function deleteAllPageCaches(int $siteId = null)
     {
+        if ($siteId !== null) {
+            $records = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
+        } else {
+            $records = PageCacheRecord::find()->all();
+        }
+
         $elements = [];
-        $records = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
         foreach ($records as $record) {
             $element = Craft::$app->elements->getElementById($record->elementId, null, $record->siteId);
             if ($element) {

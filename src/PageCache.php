@@ -10,9 +10,6 @@
 
 namespace suhype\pagecache;
 
-use suhype\pagecache\services\PageCacheService;
-use suhype\pagecache\models\Settings;
-
 use Craft;
 use craft\web\View;
 use yii\base\Event;
@@ -26,8 +23,12 @@ use craft\elements\GlobalSet;
 use craft\events\PluginEvent;
 use craft\events\TemplateEvent;
 use craft\helpers\ElementHelper;
+use craft\utilities\ClearCaches;
+use suhype\pagecache\models\Settings;
+use craft\events\RegisterCacheOptionsEvent;
 use craft\web\twig\variables\CraftVariable;
 use craft\events\RegisterElementActionsEvent;
+use suhype\pagecache\services\PageCacheService;
 use craft\console\Application as ConsoleApplication;
 use suhype\pagecache\elements\actions\PageCacheAction;
 use suhype\pagecache\variables\PageCacheVariable;
@@ -224,6 +225,19 @@ class PageCache extends Plugin
         );
     }
 
+    private function _registerClearCaches(): void
+    {
+        Event::on(ClearCaches::class, ClearCaches::EVENT_REGISTER_CACHE_OPTIONS,
+            function(RegisterCacheOptionsEvent $event) {
+                $event->options[] = [
+                    'key' => 'pagecache',
+                    'label' => Craft::t('pagecache', 'Page Cache'),
+                    'action' => [PageCache::$plugin->pageCacheService, 'deleteAllPageCaches'],
+                ];
+            }
+        );
+    }
+
     // Protected Methods
     // =========================================================================
 
@@ -279,6 +293,7 @@ class PageCache extends Plugin
         $this->_registerVariableEvent();
         $this->_registerElementEvents();
         $this->_registerActionEvents();
+        $this->_registerClearCaches();
 
         if (Craft::$app->request->getIsSiteRequest()) {
             Event::on(View::class, View::EVENT_AFTER_RENDER_PAGE_TEMPLATE,
