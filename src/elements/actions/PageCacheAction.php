@@ -39,6 +39,10 @@ class PageCacheAction extends ElementAction
      */
     public function getTriggerHtml(): ?string
     {
+        if (!PageCache::$plugin->settings->enabled) {
+            return false;
+        }
+
         \Craft::$app->view->setTemplateMode(View::TEMPLATE_MODE_CP);
 
         // Only enable for elements with url's

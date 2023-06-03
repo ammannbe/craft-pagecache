@@ -15,9 +15,9 @@
  */
 return [
     '{name} plugin loaded' => '{name} Plugin geladen',
-    'Page Cache' => 'Seiten-Cache',
+    'Page Cache' => 'Page Cache',
     'Page Cache could not be written to "{filepath}"' => 'Page Cache konnte nicht in "{filepath}" gespeichert werden',
-    'Process page cache' => 'Verarbeite Seiten-Cache',
+    'Process page cache' => 'Verarbeite Page Cache',
     'Create/Renew cache' => 'Cache erstellen/erneuern',
     'Renew cache' => 'Cache erneuern',
     'Recreate cache (delete query)' => 'Cache erneuern (Query löschen)',
