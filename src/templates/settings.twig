@@ -80,7 +80,7 @@
         siteId: {
             heading: 'Site'|t('pagecache'),
             type: "select",
-            options: [{ value: null, label: 'All sites'|t('pagecache') }]
+            options: [{ value: '', label: 'All sites'|t('pagecache') }]
                 |merge(craft.app.sites.getAllSites()
                 |map(site => {
                     value: site.id,
