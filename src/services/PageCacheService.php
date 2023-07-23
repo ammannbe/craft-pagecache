@@ -105,13 +105,13 @@ class PageCacheService extends Component
         foreach ($this->excludedUrls as $excludedUrl) {
             if (
                 isset($excludedUrl['siteId'])
-                && !is_null($excludedUrl['siteId'])
+                && (!is_null($excludedUrl['siteId']) && !empty($excludedUrl['siteId']))
                 && $element->getSite()->id != $excludedUrl['siteId']
             ) {
                 continue;
             }
 
-            $url = $this->parseUrl($element, $query);
+            $url = ltrim($this->parseUrl($element, $query), '/');
 
             if ($url == $excludedUrl['path']) {
                 return true;
