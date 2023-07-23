@@ -42,6 +42,17 @@ Go to _Settings_ → _Page Cache_ to setup the basic configuration options:
 - **Excluded URL's**: Define URL's which should not be cached (regex possible).
 - **Cache folder path**: Define a custom path, where cached files should be stored. Aliases (like `@webroot`) allowed.
 
+## Add rewrite rules rules
+
+To speed up your page even more you can add rewrite rules for .htaccess, nginx and apache.
+You can use the examples for .htaccess (with and without gzip/brotli compression):
+
+- [resources/rewrite-rules/.htaccess.example](resources/rewrite-rules/.htaccess.example)
+- [resources/rewrite-rules/.htaccess.example.br](resources/rewrite-rules/.htaccess.example.br)
+- [resources/rewrite-rules/.htaccess.example.gzip](resources/rewrite-rules/.htaccess.example.gzip)
+
+The [brotli](resources/rewrite-rules/.htaccess.example.br) and [gzip](resources/rewrite-rules/.htaccess.example.gzip) compressions can be used together, separately or not at all. Just make sure to add them **before** the [normal rewrite rules](resources/rewrite-rules/.htaccess.example)
+
 ## Using Page Cache
 
 - Go to _Settings_ → _Page Cache_
