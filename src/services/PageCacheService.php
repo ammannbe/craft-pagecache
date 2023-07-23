@@ -73,7 +73,7 @@ class PageCacheService extends Component
             $url = 'index';
         }
 
-        return "{$this->cacheFolderPath}/{$baseUrl}/{$url}/index.html";
+        return urldecode("{$this->cacheFolderPath}/{$baseUrl}/{$url}/index.html");
     }
 
     private function shouldCachePage(Element $element, string $query = null): bool
