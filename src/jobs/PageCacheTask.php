@@ -37,6 +37,11 @@ class PageCacheTask extends BaseJob
      */
     public bool $deleteQuery = false;
 
+    /**
+     * @var int
+     */
+    public int $concurrencies = 5;
+
     // Public Methods
     // =========================================================================
 
@@ -48,25 +53,47 @@ class PageCacheTask extends BaseJob
         $client = new GuzzleHttp\Client();
         $total = 0;
 
-        $elements = [];
+        $urls = [];
         foreach ($this->elementIds as $elementId) {
             /** @var Element $element */
             $element = Craft::$app->elements->getElementById($elementId['id'], null, $elementId['siteId']);
-            $records = PageCache::$plugin->pageCacheService->getPageCacheQueryRecords($element);
+            $queryRecords = PageCache::$plugin->pageCacheService->getPageCacheQueryRecords($element);
 
-            $elements[] = [
+            $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
+            $url = str_replace(Element::HOMEPAGE_URI, '', $url);
+            $urls[] = [
                 'element' => $element,
-                'records' => $records,
+                'query' => null,
+                'url' => $url,
+                'cache' => true,
             ];
 
-            $total += count($records) + 1;
+            foreach ($queryRecords as $queryRecord) {
+                $query = explode('?', $queryRecord->url)[1];
+
+                $urls[] = [
+                    'element' => $element,
+                    'query' => $query,
+                    'url' => $url . '?' . $query,
+                    'cache' => !$this->deleteQuery,
+                ];
+            }
         }
 
-        $i = 1;
-        foreach ($elements as $el) {
-            /** @var Element $element */
-            $element = $el['element'];
-            $records = $el['records'];
+        $total = count($urls);
+        $promises = [];
+        $i = 0;
+        foreach ($urls as $key => $url) {
+            PageCache::$plugin->pageCacheService->deletePageCache($url['element'], $url['query']);
+
+            if ($url['cache']) {
+                $promises[] = $client->getAsync($url['url']);
+            }
+
+            if (count($promises) >= $this->concurrencies || $key === array_key_last($urls)) {
+                GuzzleHttp\Promise\Utils::settle($promises)->wait();
+                $promises = [];
+            }
 
             $this->setProgress(
                 $queue,
@@ -77,30 +104,7 @@ class PageCacheTask extends BaseJob
                 ])
             );
             $i++;
-
-            PageCache::$plugin->pageCacheService->deletePageCacheWithQuery($element);
-            $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
-            $url = str_replace(Element::HOMEPAGE_URI, '', $url);
-            $client->getAsync($url);
-
-            if (!$this->deleteQuery) {
-                foreach ($records as $record) {
-                    $this->setProgress(
-                        $queue,
-                        $i / $total,
-                        \Craft::t('app', '{step, number} of {total, number}', [
-                            'step' => $i + 1,
-                            'total' => $total,
-                        ])
-                    );
-                    $i++;
-
-                    $query = explode('?', $record->url)[1];
-                    $client->getAsync($url . '?' . $query);
-                }
-            }
         }
-
     }
 
     // Protected Methods
