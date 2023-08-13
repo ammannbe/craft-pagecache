@@ -14,8 +14,8 @@ use suhype\pagecache\PageCache;
 
 use Craft;
 use GuzzleHttp;
-use craft\base\Element;
 use craft\queue\BaseJob;
+use suhype\pagecache\records\PageCacheQueueRecord;
 
 /**
  * @author    Benjamin Ammann
@@ -26,16 +26,6 @@ class PageCacheTask extends BaseJob
 {
     // Public Properties
     // =========================================================================
-
-    /**
-     * @var array
-     */
-    public array $elementIds;
-
-    /**
-     * @var bool
-     */
-    public bool $deleteQuery = false;
 
     /**
      * @var int
@@ -51,59 +41,39 @@ class PageCacheTask extends BaseJob
     public function execute($queue): void
     {
         $client = new GuzzleHttp\Client();
-        $total = 0;
 
-        $urls = [];
-        foreach ($this->elementIds as $elementId) {
-            /** @var Element $element */
-            $element = Craft::$app->elements->getElementById($elementId['id'], null, $elementId['siteId']);
-            $queryRecords = PageCache::$plugin->pageCacheService->getPageCacheQueryRecords($element);
+        while (!empty($queueRecords = PageCacheQueueRecord::find()->all())) {
+            $total = PageCacheQueueRecord::find()->count();
+            $processed = 0;
+            $promises = [];
 
-            $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
-            $url = str_replace(Element::HOMEPAGE_URI, '', $url);
-            $urls[] = [
-                'element' => $element,
-                'query' => null,
-                'url' => $url,
-                'cache' => true,
-            ];
+            /** @var PageCacheQueueRecord $queueRecord */
+            foreach ($queueRecords as $key => $queueRecord) {
+                $element = unserialize($queueRecord->element);
+                $query = explode('?', $queueRecord->url)[1] ?? null;
+                PageCache::$plugin->pageCacheService->deletePageCache($element, $query);
 
-            foreach ($queryRecords as $queryRecord) {
-                $query = explode('?', $queryRecord->url)[1];
+                if (!$queueRecord->delete) {
+                    $promises[] = $client->getAsync($queueRecord->url);
 
-                $urls[] = [
-                    'element' => $element,
-                    'query' => $query,
-                    'url' => $url . '?' . $query,
-                    'cache' => !$this->deleteQuery,
-                ];
+                    if (count($promises) >= $this->concurrencies || $key === array_key_last($queueRecords)) {
+                        GuzzleHttp\Promise\Utils::settle($promises)->wait();
+                        $promises = [];
+                    }
+                }
+
+                $queueRecord->delete();
+
+                $this->setProgress(
+                    $queue,
+                    $processed / $total,
+                    \Craft::t('app', '{step, number} of {total, number}', [
+                        'step' => $processed + 1,
+                        'total' => $total,
+                    ])
+                );
+                $processed++;
             }
-        }
-
-        $total = count($urls);
-        $promises = [];
-        $i = 0;
-        foreach ($urls as $key => $url) {
-            PageCache::$plugin->pageCacheService->deletePageCache($url['element'], $url['query']);
-
-            if ($url['cache']) {
-                $promises[] = $client->getAsync($url['url']);
-            }
-
-            if (count($promises) >= $this->concurrencies || $key === array_key_last($urls)) {
-                GuzzleHttp\Promise\Utils::settle($promises)->wait();
-                $promises = [];
-            }
-
-            $this->setProgress(
-                $queue,
-                $i / $total,
-                \Craft::t('app', '{step, number} of {total, number}', [
-                    'step' => $i + 1,
-                    'total' => $total,
-                ])
-            );
-            $i++;
         }
     }
 
