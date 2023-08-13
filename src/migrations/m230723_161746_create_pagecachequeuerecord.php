@@ -34,6 +34,7 @@ class m230723_161746_create_pagecachequeuerecord extends Migration
             '{{%pagecache_pagecachequeuerecord}}',
             [
                 'id' => $this->primaryKey(),
+                'uid' => $this->uid(),
                 'element' => $this->binary(),
                 'url' => $this->string(2048),
                 'delete' => $this->boolean()->notNull(),
