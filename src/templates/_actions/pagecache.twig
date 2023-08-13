@@ -19,12 +19,12 @@
 <div class="menu">
     <ul>
         <li>
-            <a class="formsubmit" data-param="cache" data-value="recreate">
+            <a class="formsubmit {{ not enabled ? 'disabled' }}" data-param="cache" data-value="recreate">
                 {{- "Create/Renew cache"|t('pagecache') -}}
             </a>
         </li>
         <li>
-            <a class="formsubmit" data-param="cache" data-value="recreateAndDeleteQuery">
+            <a class="formsubmit {{ not enabled ? 'disabled' }}" data-param="cache" data-value="recreateAndDeleteQuery">
                 {{- "Recreate cache (delete query)"|t('pagecache') -}}
             </a>
         </li>

@@ -39,10 +39,6 @@ class PageCacheAction extends ElementAction
      */
     public function getTriggerHtml(): ?string
     {
-        if (!PageCache::$plugin->settings->enabled) {
-            return false;
-        }
-
         \Craft::$app->view->setTemplateMode(View::TEMPLATE_MODE_CP);
 
         // Only enable for elements with url's
@@ -62,7 +58,9 @@ class PageCacheAction extends ElementAction
 })();
 JS, [static::class]);
 
-        return \Craft::$app->view->renderTemplate('pagecache/_actions/pagecache');
+        return \Craft::$app->view->renderTemplate('pagecache/_actions/pagecache', [
+            'enabled' => PageCache::$plugin->settings->enabled,
+        ]);
     }
 
     /**
@@ -85,10 +83,13 @@ JS, [static::class]);
 
         if ($this->cache == self::ACTION_DELETE) {
             PageCache::$plugin->pageCacheService->deletePageCacheWithQuery($entries);
-        } elseif ($this->cache == self::ACTION_RECREATE_AND_DELETE_QUERY) {
-            PageCache::$plugin->pageCacheService->recreatePageCaches($entries, true);
         } else {
-            PageCache::$plugin->pageCacheService->recreatePageCaches($entries);
+            if (!PageCache::$plugin->settings->enabled) {
+                return true;
+            }
+
+            $deleteQuery = $this->cache == self::ACTION_RECREATE_AND_DELETE_QUERY;
+            PageCache::$plugin->pageCacheService->recreatePageCaches($entries, $deleteQuery);
         }
 
         $this->setMessage(\Craft::t('pagecache', 'Process page cache'));
