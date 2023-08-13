@@ -66,11 +66,26 @@ The [brotli](resources/rewrite-rules/.htaccess.example.br) and [gzip](resources/
 - Select _Page Cache_
 - Click on _Clear caches_
 
+## Console commands
+
+Clear the whole page cache (this is the same as under _Utilities_):
+
+```bash
+php craft clear-caches/pagecache
+```
+
+Recreate existing page caches:
+
+```bash
+# Run `php craft pagecache/recreate --help` to see the possible arguments
+
+php craft pagecache/recreate
+```
+
 ## Page Cache Roadmap
 
 Some things to do, and ideas for potential features:
 
-- Add console commands to create, clear and check the cache
 - Add entry action to exclude entries
 - Add config option to include URL's
 
