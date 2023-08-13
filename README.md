@@ -70,7 +70,6 @@ The [brotli](resources/rewrite-rules/.htaccess.example.br) and [gzip](resources/
 
 Some things to do, and ideas for potential features:
 
-- Add batch job handling
 - Add console commands to create, clear and check the cache
 - Add entry action to exclude entries
 - Add config option to include URL's

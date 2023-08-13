@@ -17,9 +17,11 @@ use craft\base\Element;
 use craft\helpers\Queue;
 use craft\base\Component;
 use craft\elements\Entry;
+use craft\queue\QueueInterface;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 use suhype\pagecache\jobs\PageCacheTask;
+use suhype\pagecache\records\PageCacheQueueRecord;
 use suhype\pagecache\records\PageCacheRecord;
 
 /**
@@ -166,6 +168,66 @@ class PageCacheService extends Component
         return preg_replace($search, $replace, $html);
     }
 
+    /**
+     * Push $elements to queue
+     * 
+     * @param array<Element> $elements
+     * @param bool $deleteQuery
+     */
+    private function pushToQueue(array $elements, bool $deleteQuery = false)
+    {
+        $queue = Craft::$app->getQueue();
+        if (!$queue || !($queue instanceof QueueInterface)) {
+            return;
+        }
+
+        foreach ($elements as $element) {
+            $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
+            $url = str_replace(Element::HOMEPAGE_URI, '', $url);
+
+            if (PageCacheQueueRecord::find()->where(['url' => $url])->exists()) {
+                continue;
+            }
+
+            try {
+                $serializedElement = serialize($element);
+            } catch (\Throwable $th) {
+                continue;
+            }
+
+            $pageCacheQueueRecord = new PageCacheQueueRecord([
+                'element' => $serializedElement,
+                'url'     => $url,
+                'delete'  => false,
+            ]);
+            $pageCacheQueueRecord->save();
+
+            foreach ($this->getPageCacheQueryRecords($element) as $queryRecord) {
+                if (PageCacheQueueRecord::find()->where(['url' => $queryRecord->url])->exists()) {
+                    continue;
+                }
+
+                $pageCacheQueueRecord = new PageCacheQueueRecord([
+                    'element' => $serializedElement,
+                    'url'     => $queryRecord->url,
+                    'delete'  => $deleteQuery,
+                ]);
+                $pageCacheQueueRecord->save();
+            }
+        }
+
+        foreach ($queue->getJobInfo() as $job) {
+            $jobDetails = $queue->getJobDetails($job['id']);
+
+            if ($jobDetails['job'] instanceof PageCacheTask) {
+                // Job is already running, abort.
+                return;
+            }
+        }
+
+        Queue::push(new PageCacheTask());
+    }
+
     // Public Methods
     // =========================================================================
 
@@ -195,7 +257,10 @@ class PageCacheService extends Component
         rmdir($dir);
     }
 
-    public function getPageCacheQueryRecords(Element $element)
+    /**
+     * @return array<PageCacheRecord>
+     */
+    public function getPageCacheQueryRecords(Element $element): array
     {
         $url = $this->parseUrl($element);
 
@@ -282,18 +347,7 @@ class PageCacheService extends Component
 
         unset($element);
 
-        $elementIds = [];
-        foreach ($elements as $element) {
-            /** @var Element $element */
-            $elementIds[] = [
-                'id' => $element->id,
-                'siteId' => $element->siteId,
-            ];
-        }
-        Queue::push(new PageCacheTask([
-            'elementIds' => $elementIds,
-            'deleteQuery' => $deleteQuery,
-        ]));
+        $this->pushToQueue($elements, $deleteQuery);
     }
 
     /**
@@ -304,23 +358,24 @@ class PageCacheService extends Component
     public function recreateAllPageCaches(bool $deleteQuery = false, $siteId = null)
     {
         if ($siteId !== null) {
-            $elements = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
+            $records = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
         } else {
-            $elements = PageCacheRecord::find()->all();
+            $records = PageCacheRecord::find()->all();
         }
 
-        $elementIds = [];
-        foreach ($elements as $element) {
-            /** @var Element $element */
-            $elementIds[] = [
-                'id' => $element->elementId,
-                'siteId' => $element->siteId,
-            ];
+        /** @var array<Element> $elements */
+        $elements = [];
+        foreach ($records as $record) {
+            $element = $elements[$record->elementId] ?? null;
+            if ($element && $element->siteId === $record->siteId) {
+                continue;
+            }
+
+            $element = Craft::$app->elements->getElementById($record->elementId, null, $record->siteId);
+            $elements[] = $element;
         }
-        Queue::push(new PageCacheTask([
-            'elementIds' => $elementIds,
-            'deleteQuery' => $deleteQuery,
-        ]));
+
+        $this->pushToQueue($elements, $deleteQuery);
     }
 
     public function createPageCacheFile(Element $element, string $query = null, string $html): void

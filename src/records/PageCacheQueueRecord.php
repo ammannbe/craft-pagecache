@@ -15,14 +15,13 @@ use craft\db\ActiveRecord;
 /**
  * @author    Benjamin Ammann
  * @package   PageCache
- * @since     0.0.1
+ * @since     1.2.0
  *
  * @property  int $id
- * @property  int $elementId
- * @property  int $siteId
+ * @property  string $element serialized craft\base\Element
  * @property  string $url
  */
-class PageCacheRecord extends ActiveRecord
+class PageCacheQueueRecord extends ActiveRecord
 {
     // Public Static Methods
     // =========================================================================
@@ -32,6 +31,6 @@ class PageCacheRecord extends ActiveRecord
      */
     public static function tableName()
     {
-        return '{{%pagecache_pagecacherecords}}';
+        return '{{%pagecache_pagecachequeuerecord}}';
     }
 }
