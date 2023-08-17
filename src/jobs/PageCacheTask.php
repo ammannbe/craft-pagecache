@@ -57,7 +57,12 @@ class PageCacheTask extends BaseJob
                     $promises[] = $client->getAsync($queueRecord->url);
 
                     if (count($promises) >= $this->concurrencies || $key === array_key_last($queueRecords)) {
-                        GuzzleHttp\Promise\Utils::settle($promises)->wait();
+                        $responses = GuzzleHttp\Promise\Utils::settle($promises)->wait();
+                        foreach ($responses as $response) {
+                            if ($response['state'] === 'rejected') {
+                                \Craft::error($response['reason'], 'pagecache');
+                            }
+                        }
                         $promises = [];
                     }
                 }
