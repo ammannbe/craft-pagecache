@@ -12,6 +12,8 @@ namespace suhype\pagecache\migrations;
 
 use Craft;
 use craft\db\Migration;
+use suhype\pagecache\records\PageCacheQueueRecord;
+use suhype\pagecache\records\PageCacheRecord;
 
 /**
  * @author    Benjamin Ammann
@@ -23,11 +25,6 @@ class Install extends Migration
     // Public Properties
     // =========================================================================
 
-    /**
-     * @var string The database driver to use
-     */
-    public $driver;
-
     // Public Methods
     // =========================================================================
 
@@ -36,7 +33,6 @@ class Install extends Migration
      */
     public function safeUp()
     {
-        $this->driver = Craft::$app->getConfig()->getDb()->driver;
         if ($this->createTables()) {
             $this->addForeignKeys();
             // Refresh the db schema caches
@@ -51,7 +47,6 @@ class Install extends Migration
      */
     public function safeDown()
     {
-        $this->driver = Craft::$app->getConfig()->getDb()->driver;
         $this->removeTables();
 
         return true;
@@ -65,13 +60,9 @@ class Install extends Migration
      */
     protected function createTables()
     {
-        $tablesCreated = false;
-
-        $tableSchema = Craft::$app->db->schema->getTableSchema('{{%pagecache_pagecacherecords}}');
-        if ($tableSchema === null) {
-            $tablesCreated = true;
+        if (!$this->db->tableExists(PageCacheRecord::tableName())) {
             $this->createTable(
-                '{{%pagecache_pagecacherecords}}',
+                PageCacheRecord::tableName(),
                 [
                     'id' => $this->primaryKey(),
                     'uid' => $this->uid(),
@@ -84,7 +75,22 @@ class Install extends Migration
             );
         }
 
-        return $tablesCreated;
+        if (!$this->db->tableExists(PageCacheQueueRecord::tableName())) {
+            $this->createTable(
+                PageCacheQueueRecord::tableName(),
+                [
+                    'id' => $this->primaryKey(),
+                    'uid' => $this->uid(),
+                    'element' => $this->binary(),
+                    'url' => $this->string(2048),
+                    'delete' => $this->boolean()->notNull(),
+                    'dateCreated' => $this->dateTime()->notNull(),
+                    'dateUpdated' => $this->dateTime()->notNull(),
+                ]
+            );
+        }
+
+        return true;
     }
 
     /**
@@ -93,8 +99,8 @@ class Install extends Migration
     protected function addForeignKeys()
     {
         $this->addForeignKey(
-            $this->db->getForeignKeyName('{{%pagecache_pagecacherecords}}', 'siteId'),
-            '{{%pagecache_pagecacherecords}}',
+            $this->db->getForeignKeyName(PageCacheRecord::tableName(), 'siteId'),
+            PageCacheRecord::tableName(),
             'siteId',
             '{{%sites}}',
             'id',
@@ -108,6 +114,6 @@ class Install extends Migration
      */
     protected function removeTables()
     {
-        $this->dropTableIfExists('{{%pagecache_pagecacherecords}}');
+        $this->dropTableIfExists(PageCacheRecord::tableName());
     }
 }

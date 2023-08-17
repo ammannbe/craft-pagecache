@@ -4,6 +4,7 @@ namespace suhype\pagecache\migrations;
 
 use Craft;
 use craft\db\Migration;
+use suhype\pagecache\records\PageCacheQueueRecord;
 
 /**
  * m230723_161746_create_pagecachequeuerecord migration.
@@ -23,25 +24,20 @@ class m230723_161746_create_pagecachequeuerecord extends Migration
      */
     public function safeUp(): bool
     {
-        $this->driver = Craft::$app->getConfig()->getDb()->driver;
-
-        $tableSchema = Craft::$app->db->schema->getTableSchema('{{%pagecache_pagecachequeuerecord}}');
-        if ($tableSchema !== null) {
-            return false;
+        if (!$this->db->tableExists(PageCacheQueueRecord::tableName())) {
+            $this->createTable(
+                PageCacheQueueRecord::tableName(),
+                [
+                    'id' => $this->primaryKey(),
+                    'uid' => $this->uid(),
+                    'element' => $this->binary(),
+                    'url' => $this->string(2048),
+                    'delete' => $this->boolean()->notNull(),
+                    'dateCreated' => $this->dateTime()->notNull(),
+                    'dateUpdated' => $this->dateTime()->notNull(),
+                ]
+            );
         }
-
-        $this->createTable(
-            '{{%pagecache_pagecachequeuerecord}}',
-            [
-                'id' => $this->primaryKey(),
-                'uid' => $this->uid(),
-                'element' => $this->binary(),
-                'url' => $this->string(2048),
-                'delete' => $this->boolean()->notNull(),
-                'dateCreated' => $this->dateTime()->notNull(),
-                'dateUpdated' => $this->dateTime()->notNull(),
-            ]
-        );
 
         return true;
     }
@@ -51,8 +47,7 @@ class m230723_161746_create_pagecachequeuerecord extends Migration
      */
     public function safeDown(): bool
     {
-        $this->driver = Craft::$app->getConfig()->getDb()->driver;
-        $this->dropTableIfExists('{{%pagecache_pagecachequeuerecord}}');
+        $this->dropTableIfExists(PageCacheQueueRecord::tableName());
 
         return true;
     }
