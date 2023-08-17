@@ -58,7 +58,7 @@ class PageCache extends Plugin
     /**
      * @var string
      */
-    public $schemaVersion = '0.2.0';
+    public $schemaVersion = '0.2.3';
 
     /**
      * @var bool
