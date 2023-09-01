@@ -298,7 +298,13 @@ class PageCacheService extends Component
 
         $matrix = \craft\elements\MatrixBlock::find()->relatedTo($element)->all();
         foreach($matrix as $el) {
-            $owner = $el->getOwner();
+            try {
+                // Prevent invalid owner ID error
+                $owner = $el->getOwner();
+            } catch (\yii\base\InvalidConfigException $e) {
+                continue;
+            }
+
             try {
                 if (!$owner->uri && $owner->getOwner()?->uri) { $owner = $owner->owner; }
             } catch (\Exception $e) { }
