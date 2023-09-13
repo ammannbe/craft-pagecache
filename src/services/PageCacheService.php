@@ -301,12 +301,16 @@ class PageCacheService extends Component
             try {
                 // Prevent invalid owner ID error
                 $owner = $el->getOwner();
+
+                if (!$owner) {
+                    continue;
+                }
             } catch (\yii\base\InvalidConfigException $e) {
                 continue;
             }
 
             try {
-                if (!$owner->uri && $owner->getOwner()?->uri) { $owner = $owner->owner; }
+                if (!$owner->uri && $owner->getOwner()->uri ?? false) { $owner = $owner->owner; }
             } catch (\Exception $e) { }
             if (!$owner->uri) { continue; }
             $entries[$owner->id] = $owner;
