@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.2.4 - 2023-09-16
+
+### Fixed
+
+- fixed invalid owner ID exception
+- fixed php 7.4 syntax error
+
 ## 0.2.3 - 2023-08-17
 
 ### Fixed
