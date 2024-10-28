@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Page Cache plugin for Craft CMS 4.x
  *
@@ -31,7 +32,8 @@ use suhype\pagecache\records\PageCacheRecord;
  */
 class PageCacheService extends Component
 {
-    public function __construct() {
+    public function __construct()
+    {
         $this->enabled = PageCache::$plugin->settings->enabled;
         $this->gzip = PageCache::$plugin->settings->gzip;
         $this->brotli = PageCache::$plugin->settings->brotli && function_exists('brotli_compress');
@@ -157,14 +159,14 @@ class PageCacheService extends Component
             '/(\s)+/s',          // shorten multiple whitespace sequences
             '/<!--(.|\s)*?-->/', // Remove HTML comments
         ];
-    
+
         $replace = [
             '>',
             '<',
             '\\1',
             '',
         ];
-    
+
         return preg_replace($search, $replace, $html);
     }
 
@@ -248,12 +250,12 @@ class PageCacheService extends Component
             new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST
         );
-        
+
         foreach ($files as $fileinfo) {
             $todo = ($fileinfo->isDir() ? 'rmdir' : 'unlink');
             $todo($fileinfo->getRealPath());
         }
-        
+
         rmdir($dir);
     }
 
@@ -280,18 +282,24 @@ class PageCacheService extends Component
 
         if (class_exists('\benf\neo\elements\Block')) {
             $neo = \benf\neo\elements\Block::find()->relatedTo($element)->all();
-            foreach($neo as $el) {
+            foreach ($neo as $el) {
                 $owner = $el->getOwner();
-                if (!$owner->uri) { continue; }
+                if (!$owner->uri) {
+                    continue;
+                }
+
                 $entries[$owner->id] = $owner;
             }
         }
 
         if (class_exists('\verbb\supertable\elements\SuperTableBlockElement')) {
             $supertable = \verbb\supertable\elements\SuperTableBlockElement::find()->relatedTo($element)->all();
-            foreach($supertable as $el) {
+            foreach ($supertable as $el) {
                 $owner = $el->getOwner();
-                if (!$owner->uri) { continue; }
+                if (!$owner->uri) {
+                    continue;
+                }
+
                 $entries[$owner->id] = $owner;
             }
         }
@@ -301,9 +309,16 @@ class PageCacheService extends Component
             $owner = null;
             try {
                 $owner = $el->getOwner();
-                if (!$owner->uri && $owner->getOwner()?->uri) { $owner = $owner->owner; }
-            } catch (\Exception $e) { }
-            if (!$owner || !$owner->uri) { continue; }
+                if (!$owner->uri && $owner->getOwner()?->uri) {
+                    $owner = $owner->owner;
+                }
+            } catch (\Exception $e) {
+            }
+
+            if (!$owner || !$owner->uri) {
+                continue;
+            }
+
             $entries[$owner->id] = $owner;
         }
 
@@ -491,7 +506,7 @@ class PageCacheService extends Component
 
         foreach ($elements as $element) {
             $this->deletePageCache($element);
-    
+
             $records = $this->getPageCacheQueryRecords($element);
             foreach ($records as $record) {
                 $query = explode('?', $record->url)[1];
