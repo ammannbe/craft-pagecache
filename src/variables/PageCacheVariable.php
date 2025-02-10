@@ -18,10 +18,12 @@ class PageCacheVariable
 {
     public function csrfInput()
     {
-        Craft::$app->deprecator->log(
-            'pagecache.csrfInput',
-            'The method `csrfInput()` is deprecated. Use the build-in async `csrfInput({ async: true })` instead.'
-        );
+        if ((float) Craft::$app->version >= 5) {
+            Craft::$app->deprecator->log(
+                'pagecache.csrfInput',
+                'The method `csrfInput()` is deprecated. Use the build-in async `csrfInput({ async: true })` instead.'
+            );
+        }
 
         $rand = rand();
 
