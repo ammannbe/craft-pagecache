@@ -13,6 +13,7 @@ namespace suhype\pagecache\jobs;
 use suhype\pagecache\PageCache;
 
 use Craft;
+use craft\elements\Entry;
 use GuzzleHttp;
 use craft\queue\BaseJob;
 use suhype\pagecache\records\PageCacheQueueRecord;
@@ -43,13 +44,19 @@ class PageCacheTask extends BaseJob
         $client = new GuzzleHttp\Client();
 
         while (!empty($queueRecords = PageCacheQueueRecord::find()->all())) {
+            $elementIds = [];
+            foreach ($queueRecords as $key => $qr) {
+                $elementIds[$key] = json_decode($qr->element)->id;
+            }
+            $elements = Entry::find()->id($elementIds)->collect();
+
             $total = count($queueRecords);
             $processed = 0;
             $promises = [];
 
             /** @var PageCacheQueueRecord $queueRecord */
             foreach ($queueRecords as $key => $queueRecord) {
-                $element = unserialize($queueRecord->element);
+                $element = $elements->where('id', json_decode($queueRecord->element)->id)->first();
                 $query = explode('?', $queueRecord->url)[1] ?? null;
                 PageCache::$plugin->pageCacheService->deletePageCache($element, $query);
 

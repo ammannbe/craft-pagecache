@@ -206,7 +206,7 @@ class PageCache extends Plugin
                     return;
                 } elseif ($type == 'section') {
                     /** @var \craft\models\Section $section */
-                    $section = Craft::$app->sections->getSectionByUid($uid);
+                    $section = Craft::$app->getEntries()->getSectionByUid($uid);
                     $settings = $section->getSiteSettings();
                     $setting = reset($settings);
 

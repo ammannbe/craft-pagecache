@@ -217,19 +217,13 @@ class PageCacheService extends Component
                 continue;
             }
 
-            try {
-                $serializedElement = serialize($element);
-            } catch (\Throwable $th) {
-                continue;
-            }
-
             foreach ($this->getPageCacheQueryRecords($element) as $queryRecord) {
                 if (PageCacheQueueRecord::find()->where(['url' => $queryRecord->url])->exists()) {
                     continue;
                 }
 
                 $pageCacheQueueRecord = new PageCacheQueueRecord([
-                    'element' => $serializedElement,
+                    'element' => $element,
                     'url'     => $queryRecord->url,
                     'delete'  => true,
                 ]);
@@ -237,7 +231,7 @@ class PageCacheService extends Component
             }
 
             $pageCacheQueueRecord = new PageCacheQueueRecord([
-                'element' => $serializedElement,
+                'element' => $element,
                 'url'     => $url,
                 'delete'  => false,
             ]);
@@ -303,6 +297,10 @@ class PageCacheService extends Component
     {
         $entries = [];
         foreach (Entry::find()->relatedTo($element)->all() as $element) {
+            if (!$element->uri) {
+                continue;
+            }
+
             $entries[$element->id] = $element;
         }
 
@@ -330,21 +328,8 @@ class PageCacheService extends Component
             }
         }
 
-        $matrix = \craft\elements\MatrixBlock::find()->relatedTo($element)->all();
-        foreach ($matrix as $el) {
-            $owner = null;
-            try {
-                $owner = $el->getOwner();
-                if (!$owner->uri && $owner->getOwner()?->uri) {
-                    $owner = $owner->owner;
-                }
-            } catch (\Exception $e) {
-            }
-
-            if (!$owner || !$owner->uri) {
-                continue;
-            }
-
+        $owner = $element->getOwner();
+        if ($owner && $owner->uri) {
             $entries[$owner->id] = $owner;
         }
 
