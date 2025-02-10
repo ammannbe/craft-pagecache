@@ -39,7 +39,8 @@ Go to _Settings_ → _Page Cache_ to setup the basic configuration options:
 - **Enable gzip compression**: Serve gzip compressed cached files.
 - **Enable brotli compression**: Serve brotli compressed cached files. Only works if the PHP brotli extension is installed.
 - **When globals are saved**: Choose what happens when globals got saved. Choose between "Renew cache", "Recreate cache (delete query)", "Delete cache"
-- **Excluded URL's**: Define URL's which should not be cached (regex possible).
+- **Excluded URL's**: Define URL's which should **never** be cached (regex possible).
+- **Included URL's**: Define URL's which should **always** be cached (regex possible). This options overwrites the **Excluded URL's** option.
 - **Cache folder path**: Define a custom path, where cached files should be stored. Aliases (like `@webroot`) allowed.
 
 ## Add rewrite rules rules

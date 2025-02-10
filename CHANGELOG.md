@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.3.0 - 2025-02-10
+
+### Changed
+
+- Deprecated `csrfInput()` variable
+- Added `includeUrls` config option
+- Don't cache pages when the current user is logged in
+
+### Fixed
+
+- Drastically improved DB queries
+
 ## 1.2.3 - 2023-08-17
 
 ### Fixed
