@@ -71,7 +71,6 @@ class PageCache extends Plugin
     public bool $hasCpSection = false;
 
     public const GLOBAL_ACTION_RECREATE = 'recreate';
-    public const GLOBAL_ACTION_RECREATE_AND_DELETE_QUERY = 'recreateAndDeleteQuery';
     public const GLOBAL_ACTION_DELETE = 'delete';
 
     // Protected Methods
@@ -141,12 +140,8 @@ class PageCache extends Plugin
                         $this->pageCacheService->deleteAllPageCaches($event->sender->siteId);
                         break;
 
-                    case PageCache::GLOBAL_ACTION_RECREATE_AND_DELETE_QUERY:
-                        $this->pageCacheService->recreateAllPageCaches(true, $event->sender->siteId);
-                        break;
-
                     default:
-                        $this->pageCacheService->recreateAllPageCaches(false, $event->sender->siteId);
+                        $this->pageCacheService->recreateAllPageCaches($event->sender->siteId);
                         break;
                 }
             }
@@ -295,7 +290,7 @@ class PageCache extends Plugin
         $this->_registerActionEvents();
         $this->_registerClearCaches();
 
-        if (Craft::$app->request->getIsSiteRequest()) {
+        if (Craft::$app->request->getIsSiteRequest() && Craft::$app->request->getIsGet() && Craft::$app->user->isGuest) {
             Event::on(View::class, View::EVENT_AFTER_RENDER_PAGE_TEMPLATE,
                 function(TemplateEvent $event) {
                     if (!Craft::$app->getResponse()->getIsOk()) {

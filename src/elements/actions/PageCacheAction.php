@@ -23,7 +23,6 @@ use craft\elements\db\ElementQueryInterface;
 class PageCacheAction extends ElementAction
 {
     private const ACTION_RECREATE = 'recreate';
-    private const ACTION_RECREATE_AND_DELETE_QUERY = 'recreateAndDeleteQuery';
     private const ACTION_DELETE = 'delete';
 
     /**
@@ -88,8 +87,7 @@ JS, [static::class]);
                 return true;
             }
 
-            $deleteQuery = $this->cache == self::ACTION_RECREATE_AND_DELETE_QUERY;
-            PageCache::$plugin->pageCacheService->recreatePageCaches($entries, $deleteQuery);
+            PageCache::$plugin->pageCacheService->recreatePageCaches($entries);
         }
 
         $this->setMessage(\Craft::t('pagecache', 'Process page cache'));

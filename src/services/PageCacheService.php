@@ -39,6 +39,7 @@ class PageCacheService extends Component
         $this->brotli = PageCache::$plugin->settings->brotli && function_exists('brotli_compress');
         $this->optimize = PageCache::$plugin->settings->optimize;
         $this->excludedUrls = PageCache::$plugin->settings->excludedUrls;
+        $this->includedUrls = PageCache::$plugin->settings->includedUrls;
         $this->cacheFolderPath = Craft::getAlias(PageCache::$plugin->settings->cacheFolderPath);
     }
 
@@ -50,6 +51,7 @@ class PageCacheService extends Component
     private $brotli;
     private $optimize;
     private $excludedUrls;
+    private $includedUrls;
     private $cacheFolderPath;
 
     // Private Methods
@@ -86,7 +88,7 @@ class PageCacheService extends Component
             return false;
         }
 
-        if ($this->isPathExcluded($element, $query)) {
+        if ($this->isPathExcluded($element, $query) && !$this->isPathIncluded($element, $query)) {
             return false;
         }
 
@@ -122,6 +124,31 @@ class PageCacheService extends Component
             }
 
             if (preg_match("/{$excludedUrl['path']}/", $url)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isPathIncluded(Element $element, string $query = null): bool
+    {
+        foreach ($this->includedUrls as $includedUrl) {
+            if (
+                isset($includedUrl['siteId'])
+                && (!is_null($includedUrl['siteId']) && !empty($includedUrl['siteId']))
+                && $element->getSite()->id != $includedUrl['siteId']
+            ) {
+                continue;
+            }
+
+            $url = ltrim($this->parseUrl($element, $query), '/');
+
+            if ($url == $includedUrl['path']) {
+                return true;
+            }
+
+            if (preg_match("/{$includedUrl['path']}/", $url)) {
                 return true;
             }
         }
@@ -174,9 +201,8 @@ class PageCacheService extends Component
      * Push $elements to queue
      * 
      * @param array<Element> $elements
-     * @param bool $deleteQuery
      */
-    private function pushToQueue(array $elements, bool $deleteQuery = false)
+    private function pushToQueue(array $elements)
     {
         $queue = Craft::$app->getQueue();
         if (!$queue || !($queue instanceof QueueInterface)) {
@@ -197,13 +223,6 @@ class PageCacheService extends Component
                 continue;
             }
 
-            $pageCacheQueueRecord = new PageCacheQueueRecord([
-                'element' => $serializedElement,
-                'url'     => $url,
-                'delete'  => false,
-            ]);
-            $pageCacheQueueRecord->save();
-
             foreach ($this->getPageCacheQueryRecords($element) as $queryRecord) {
                 if (PageCacheQueueRecord::find()->where(['url' => $queryRecord->url])->exists()) {
                     continue;
@@ -212,10 +231,17 @@ class PageCacheService extends Component
                 $pageCacheQueueRecord = new PageCacheQueueRecord([
                     'element' => $serializedElement,
                     'url'     => $queryRecord->url,
-                    'delete'  => $deleteQuery,
+                    'delete'  => true,
                 ]);
                 $pageCacheQueueRecord->save();
             }
+
+            $pageCacheQueueRecord = new PageCacheQueueRecord([
+                'element' => $serializedElement,
+                'url'     => $url,
+                'delete'  => false,
+            ]);
+            $pageCacheQueueRecord->save();
         }
 
         foreach ($queue->getJobInfo() as $job) {
@@ -348,9 +374,8 @@ class PageCacheService extends Component
      * Recreate page caches of element(s)
      * 
      * @param array<Element>|Element $element
-     * @param bool $deleteQuery
      */
-    public function recreatePageCaches($element, bool $deleteQuery = false)
+    public function recreatePageCaches($element)
     {
         if (empty($element)) {
             return;
@@ -363,15 +388,13 @@ class PageCacheService extends Component
 
         unset($element);
 
-        $this->pushToQueue($elements, $deleteQuery);
+        $this->pushToQueue($elements);
     }
 
     /**
      * Recreate all existing page caches
-     *
-     * @param bool $deleteQuery
      */
-    public function recreateAllPageCaches(bool $deleteQuery = false, $siteId = null)
+    public function recreateAllPageCaches($siteId = null)
     {
         if ($siteId !== null) {
             $records = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
@@ -391,7 +414,7 @@ class PageCacheService extends Component
             $elements[] = $element;
         }
 
-        $this->pushToQueue($elements, $deleteQuery);
+        $this->pushToQueue($elements);
     }
 
     public function createPageCacheFile(Element $element, string $query = null, string $html): void

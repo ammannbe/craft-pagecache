@@ -30,11 +30,6 @@ class RecreateController extends Controller
      */
     public ?int $siteId = null;
 
-    /**
-     * @var bool Delete URLs with query strings or not.
-     */
-    public bool $deleteQuery = false;
-
     // Public Methods
     // =========================================================================
 
@@ -45,7 +40,6 @@ class RecreateController extends Controller
         switch ($actionID) {
             case 'index':
                 $options[] = 'siteId';
-                $options[] = 'deleteQuery';
                 break;
         }
 
@@ -62,9 +56,8 @@ class RecreateController extends Controller
         Console::output('Start the recreate page cache job...');
 
         $siteId = $this->siteId ?? null;
-        $deleteQuery = $this->deleteQuery ?? false;
 
-        PageCache::$plugin->pageCacheService->recreateAllPageCaches($deleteQuery, $siteId);
+        PageCache::$plugin->pageCacheService->recreateAllPageCaches($siteId);
 
         Console::output('Job successfully queued and started.');
         return ExitCode::OK;
