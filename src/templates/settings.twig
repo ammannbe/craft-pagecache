@@ -98,6 +98,33 @@
     allowDelete: true,
 }) }}
 
+{{ forms.editableTable({
+    label: 'Included URL\'s'|t('pagecache'),
+    id: 'includedUrls',
+    name: 'includedUrls',
+    cols: {
+        siteId: {
+            heading: 'Site'|t('pagecache'),
+            type: "select",
+            options: [{ value: '', label: 'All sites'|t('pagecache') }]
+                |merge(craft.app.sites.getAllSites()
+                |map(site => {
+                    value: site.id,
+                    label: site.name
+                })),
+            thin: true,
+        },
+        path: {
+            heading: "Included URL's"|t('pagecache'),
+            type: "singleline"
+        },
+    },
+    rows: settings['includedUrls'],
+    allowAdd: true,
+    allowReorder: true,
+    allowDelete: true,
+}) }}
+
 {{ craft.cp.field(forms.autosuggest({
         id: 'cacheFolderPath',
         name: 'cacheFolderPath',
