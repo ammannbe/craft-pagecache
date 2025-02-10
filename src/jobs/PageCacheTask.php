@@ -43,7 +43,7 @@ class PageCacheTask extends BaseJob
         $client = new GuzzleHttp\Client();
 
         while (!empty($queueRecords = PageCacheQueueRecord::find()->all())) {
-            $total = PageCacheQueueRecord::find()->count();
+            $total = count($queueRecords);
             $processed = 0;
             $promises = [];
 
