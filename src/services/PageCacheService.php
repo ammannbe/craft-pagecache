@@ -328,9 +328,12 @@ class PageCacheService extends Component
             }
         }
 
-        $owner = $element->getOwner();
-        if ($owner && $owner->uri) {
-            $entries[$owner->id] = $owner;
+        try {
+            $owner = $element->getOwner();
+            if ($owner && $owner->uri) {
+                $entries[$owner->id] = $owner;
+            }
+        } catch (\Exception $e) {
         }
 
         return $entries;
