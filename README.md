@@ -1,4 +1,4 @@
-# Page Cache plugin for Craft CMS 4.x
+# Page Cache plugin for Craft CMS
 
 Simple but useful Page Cache Plugin.
 
@@ -6,7 +6,7 @@ With this plugin you can create static HTML files of your entries.
 
 ## Requirements
 
-This plugin requires Craft CMS 4.x.
+This plugin requires Craft CMS 3.x or later.
 
 ## Installation
 

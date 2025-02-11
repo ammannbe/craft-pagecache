@@ -1,6 +1,6 @@
 <?php
 /**
- * Page Cache plugin for Craft CMS 4.x
+ * Page Cache plugin for Craft CMS
  *
  * Simple HTML Page Cache Plugin
  *
