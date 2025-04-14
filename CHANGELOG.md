@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.3.1 - 2025-04-14
+
+### Fixed
+
+- Fixed implicitly nullable parameters deprecation warning
+- Decode URL before checking against include/exclude list
+
 ## 1.3.0 - 2025-02-10
 
 ### Changed
