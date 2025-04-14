@@ -57,7 +57,7 @@ class PageCacheService extends Component
     // Private Methods
     // =========================================================================
 
-    private function parseUrl(Element $element, string $query = null)
+    private function parseUrl(Element $element, ?string $query = null)
     {
         $url = trim(implode('?', [$element->uri, $query]), '?');
 
@@ -66,7 +66,7 @@ class PageCacheService extends Component
         return '/' . $url;
     }
 
-    private function parsePath(Element $element, string $query = null)
+    private function parsePath(Element $element, ?string $query = null)
     {
         $url = trim($this->parseUrl($element, $query), '/');
         $url = str_replace('?', '/@', $url);
@@ -82,7 +82,7 @@ class PageCacheService extends Component
         return urldecode("{$this->cacheFolderPath}/{$baseUrl}/{$url}/index.html");
     }
 
-    private function shouldCachePage(Element $element, string $query = null): bool
+    private function shouldCachePage(Element $element, ?string $query = null): bool
     {
         if (!$this->enabled) {
             return false;
@@ -106,7 +106,7 @@ class PageCacheService extends Component
         return true;
     }
 
-    private function isPathExcluded(Element $element, string $query = null): bool
+    private function isPathExcluded(Element $element, ?string $query = null): bool
     {
         foreach ($this->excludedUrls as $excludedUrl) {
             if (
@@ -131,7 +131,7 @@ class PageCacheService extends Component
         return false;
     }
 
-    private function isPathIncluded(Element $element, string $query = null): bool
+    private function isPathIncluded(Element $element, ?string $query = null): bool
     {
         foreach ($this->includedUrls as $includedUrl) {
             if (
@@ -156,14 +156,14 @@ class PageCacheService extends Component
         return false;
     }
 
-    private function pageCacheFileExists(Element $element, string $query = null)
+    private function pageCacheFileExists(Element $element, ?string $query = null)
     {
         $path = $this->parsePath($element, $query);
 
         return file_exists($path);
     }
 
-    private function pageCacheRecordExists(Element $element, string $query = null)
+    private function pageCacheRecordExists(Element $element, ?string $query = null)
     {
         $condition = [
             'url' => $this->parseUrl($element, $query),
@@ -351,7 +351,7 @@ class PageCacheService extends Component
         return $entries;
     }
 
-    public function createPageCache(Element $element, string $query = null, string $html)
+    public function createPageCache(Element $element, ?string $query = null, string $html)
     {
         if (!$this->shouldCachePage($element, $query, $html) || !$this->shouldCacheHtml($html)) {
             $this->deletePageCache($element, $query);
@@ -417,7 +417,7 @@ class PageCacheService extends Component
         $this->pushToQueue($elements);
     }
 
-    public function createPageCacheFile(Element $element, string $query = null, string $html): void
+    public function createPageCacheFile(Element $element, ?string $query = null, string $html): void
     {
         if ($this->optimize) {
             $html = $this->optimizeHtml($html);
@@ -460,14 +460,14 @@ class PageCacheService extends Component
         }
     }
 
-    public function getPageCacheFileContents(Element $element, string $query = null)
+    public function getPageCacheFileContents(Element $element, ?string $query = null)
     {
         $path = $this->parsePath($element, $query);
 
         return file_get_contents($path);
     }
 
-    private function deletePageCacheFile(Element $element, string $query = null)
+    private function deletePageCacheFile(Element $element, ?string $query = null)
     {
         $path = $this->parsePath($element, $query);
 
@@ -490,7 +490,7 @@ class PageCacheService extends Component
         }
     }
 
-    private function deletePageCacheRecord(Element $element, string $query = null)
+    private function deletePageCacheRecord(Element $element, ?string $query = null)
     {
         $condition = [
             'url' => $this->parseUrl($element, $query),
@@ -502,7 +502,7 @@ class PageCacheService extends Component
             ->one()->delete();
     }
 
-    public function deletePageCache(Element $element, string $query = null)
+    public function deletePageCache(Element $element, ?string $query = null)
     {
         if ($this->pageCacheFileExists($element, $query)) {
             $this->deletePageCacheFile($element, $query);
@@ -541,7 +541,7 @@ class PageCacheService extends Component
     /**
      * Delete all existing page caches
      */
-    public function deleteAllPageCaches(int $siteId = null)
+    public function deleteAllPageCaches(?int $siteId = null)
     {
         if ($siteId !== null) {
             $records = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
@@ -560,7 +560,7 @@ class PageCacheService extends Component
         $this->deletePageCacheWithQuery($elements);
     }
 
-    public function renamePageCache(Element $oldElement, Element $newElement, string $query = null)
+    public function renamePageCache(Element $oldElement, Element $newElement, ?string $query = null)
     {
         $condition = [
             'url' => $this->parseUrl($oldElement, $query),
@@ -580,7 +580,7 @@ class PageCacheService extends Component
     /*
      * @return void|false
      */
-    public function servePageCacheIfExists(Element $element, string $query = null)
+    public function servePageCacheIfExists(Element $element, ?string $query = null)
     {
         if (Craft::$app->request->getIsCpRequest()) {
             return false;
