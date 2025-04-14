@@ -123,7 +123,7 @@ class PageCacheService extends Component
                 return true;
             }
 
-            if (preg_match("/{$excludedUrl['path']}/", $url)) {
+            if (preg_match("/{$excludedUrl['path']}/", urldecode($url))) {
                 return true;
             }
         }
@@ -148,7 +148,7 @@ class PageCacheService extends Component
                 return true;
             }
 
-            if (preg_match("/{$includedUrl['path']}/", $url)) {
+            if (preg_match("/{$includedUrl['path']}/", urldecode($url))) {
                 return true;
             }
         }
