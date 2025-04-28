@@ -31,5 +31,6 @@ return [
     'Site' => 'Seite',
     'All sites' => 'Alle Seiten',
     'Excluded URL\'s' => 'Ausgeschlossene URL\'s',
+    'Included URL\'s' => 'Eingeschlossene URL\'s',
     'Cache folder path' => 'Cache Ordner-Pfad',
 ];

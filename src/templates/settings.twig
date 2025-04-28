@@ -71,59 +71,63 @@
         name: 'globalSaveAction'
 })|raw }}
 
-{{ forms.editableTable({
-    label: 'Excluded URL\'s'|t('pagecache'),
-    id: 'excludedUrls',
-    name: 'excludedUrls',
-    cols: {
-        siteId: {
-            heading: 'Site'|t('pagecache'),
-            type: "select",
-            options: [{ value: '', label: 'All sites'|t('pagecache') }]
-                |merge(craft.app.sites.getAllSites()
-                |map(site => {
-                    value: site.id,
-                    label: site.name
-                })),
-            thin: true,
+{{ craft.cp.field(forms.editableTable({
+        label: "Excluded URL's"|t('pagecache'),
+        id: 'excludedUrls',
+        name: 'excludedUrls',
+        cols: {
+            siteId: {
+                heading: 'Site'|t('pagecache'),
+                type: "select",
+                options: [{ value: '', label: 'All sites'|t('pagecache') }]
+                    |merge(craft.app.sites.getAllSites()
+                    |map(site => {
+                        value: site.id,
+                        label: site.name
+                    })),
+                thin: true,
+            },
+            path: {
+                heading: "Excluded URL's"|t('pagecache'),
+                type: "singleline"
+            },
         },
-        path: {
-            heading: "Excluded URL's"|t('pagecache'),
-            type: "singleline"
-        },
-    },
-    rows: settings['excludedUrls'],
-    allowAdd: true,
-    allowReorder: true,
-    allowDelete: true,
-}) }}
+        rows: settings['excludedUrls'],
+        allowAdd: true,
+        allowReorder: true,
+        allowDelete: true,
+    }), {
+        label: "Excluded URL's"|t('pagecache'),
+})|raw }}
 
-{{ forms.editableTable({
-    label: 'Included URL\'s'|t('pagecache'),
-    id: 'includedUrls',
-    name: 'includedUrls',
-    cols: {
-        siteId: {
-            heading: 'Site'|t('pagecache'),
-            type: "select",
-            options: [{ value: '', label: 'All sites'|t('pagecache') }]
-                |merge(craft.app.sites.getAllSites()
-                |map(site => {
-                    value: site.id,
-                    label: site.name
-                })),
-            thin: true,
+{{ craft.cp.field(forms.editableTable({
+        label: "Included URL's"|t('pagecache'),
+        id: 'includedUrls',
+        name: 'includedUrls',
+        cols: {
+            siteId: {
+                heading: 'Site'|t('pagecache'),
+                type: "select",
+                options: [{ value: '', label: 'All sites'|t('pagecache') }]
+                    |merge(craft.app.sites.getAllSites()
+                    |map(site => {
+                        value: site.id,
+                        label: site.name
+                    })),
+                thin: true,
+            },
+            path: {
+                heading: "Included URL's"|t('pagecache'),
+                type: "singleline"
+            },
         },
-        path: {
-            heading: "Included URL's"|t('pagecache'),
-            type: "singleline"
-        },
-    },
-    rows: settings['includedUrls'],
-    allowAdd: true,
-    allowReorder: true,
-    allowDelete: true,
-}) }}
+        rows: settings['includedUrls'],
+        allowAdd: true,
+        allowReorder: true,
+        allowDelete: true,
+    }), {
+        label: "Included URL's"|t('pagecache'),
+})|raw }}
 
 {{ craft.cp.field(forms.autosuggest({
         id: 'cacheFolderPath',
