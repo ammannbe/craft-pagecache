@@ -31,6 +31,10 @@ use craft\events\RegisterElementActionsEvent;
 use suhype\pagecache\services\PageCacheService;
 use craft\console\Application as ConsoleApplication;
 use suhype\pagecache\elements\actions\PageCacheAction;
+use suhype\pagecache\services\CreateCacheService;
+use suhype\pagecache\services\DeleteCacheService;
+use suhype\pagecache\services\RefreshCacheService;
+use suhype\pagecache\services\ServeCacheService;
 use suhype\pagecache\variables\PageCacheVariable;
 
 /**
@@ -41,6 +45,10 @@ use suhype\pagecache\variables\PageCacheVariable;
  * @since     0.0.1
  *
  * @property  PageCacheService $pageCacheService
+ * @property  DeleteCacheService $deleteCacheService
+ * @property  CreateCacheService $createCacheService
+ * @property  RefreshCacheService $refreshCacheService
+ * @property  ServeCacheService $serveCacheService
  */
 class PageCache extends Plugin
 {
@@ -70,7 +78,12 @@ class PageCache extends Plugin
      */
     public bool $hasCpSection = false;
 
+    /**
+     * @deprecated since 2.0.0 - use PageCacheService::GLOBAL_ACTION_REFRESH
+     */
     public const GLOBAL_ACTION_RECREATE = 'recreate';
+
+    public const GLOBAL_ACTION_REFRESH = 'refresh';
     public const GLOBAL_ACTION_DELETE = 'delete';
 
     // Protected Methods
@@ -126,7 +139,7 @@ class PageCache extends Plugin
                 $element = Entry::find()->id($event->element->id)->one();
                 if ($element && $event->element->slug !== $element->slug) {
                     $elements = $this->pageCacheService->getRelatedElements($element);
-                    $this->pageCacheService->deletePageCacheWithQuery([$element, ...$elements]);
+                    $this->deleteCacheService->deleteForElementWithQuery([$element, ...$elements]);
                 }
             }
         );
@@ -137,11 +150,11 @@ class PageCache extends Plugin
             function (Event $event) {
                 switch (PageCache::$plugin->settings->globalSaveAction) {
                     case PageCache::GLOBAL_ACTION_DELETE:
-                        $this->pageCacheService->deleteAllPageCaches($event->sender->siteId);
+                        $this->deleteCacheService->delete($event->sender->siteId);
                         break;
 
                     default:
-                        $this->pageCacheService->recreateAllPageCaches($event->sender->siteId);
+                        $this->refreshCacheService->refresh($event->sender->siteId);
                         break;
                 }
             }
@@ -160,7 +173,7 @@ class PageCache extends Plugin
                 $elements[$event->element->id] = $event->element;
 
                 $toDelete = [];
-                $toRecreate = [];
+                $toRefresh = [];
 
                 foreach ($elements as $element) {
                     if (!$element->uri || ElementHelper::isDraftOrRevision($element) || $element->propagating || $element->resaving) {
@@ -172,11 +185,11 @@ class PageCache extends Plugin
                         continue;
                     }
 
-                    $toRecreate[$element->id] = $element;
+                    $toRefresh[$element->id] = $element;
                 }
 
-                $this->pageCacheService->deletePageCacheWithQuery($toDelete);
-                $this->pageCacheService->recreatePageCaches($toRecreate);
+                $this->deleteCacheService->deleteForElementWithQuery($toDelete);
+                $this->refreshCacheService->refreshForElements($toRefresh);
             }
         );
 
@@ -188,7 +201,7 @@ class PageCache extends Plugin
                     return;
                 }
 
-                $this->pageCacheService->deletePageCacheWithQuery($event->element);
+                $this->deleteCacheService->deleteForElementWithQuery($event->element);
             }
         );
     }
@@ -227,7 +240,7 @@ class PageCache extends Plugin
                 $event->options[] = [
                     'key' => 'pagecache',
                     'label' => Craft::t('pagecache', 'Page Cache'),
-                    'action' => [PageCache::$plugin->pageCacheService, 'deleteAllPageCaches'],
+                    'action' => [PageCache::$plugin->deleteCacheService, 'delete'],
                 ];
             }
         );
@@ -265,6 +278,10 @@ class PageCache extends Plugin
 
         $this->setComponents([
             'pageCacheService' => PageCacheService::class,
+            'createCacheService' => CreateCacheService::class,
+            'refreshCacheService' => RefreshCacheService::class,
+            'deleteCacheService' => DeleteCacheService::class,
+            'serveCacheService' => ServeCacheService::class,
         ]);
 
         if (Craft::$app instanceof ConsoleApplication) {
@@ -278,7 +295,7 @@ class PageCache extends Plugin
                 function() {
                     $element = Craft::$app->getUrlManager()->getMatchedElement();
                     if ($element && $element->uri) {
-                        $this->pageCacheService->servePageCacheIfExists($element, Craft::$app->request->getQueryStringWithoutPath());
+                        $this->serveCacheService->serve($element, Craft::$app->request->getQueryStringWithoutPath());
                     }
                 }
             );
@@ -303,7 +320,7 @@ class PageCache extends Plugin
                         return;
                     }
 
-                    $this->pageCacheService->createPageCache($element, Craft::$app->request->getQueryStringWithoutPath(), $event->output);
+                    $this->createCacheService->createFromSiteRequest($element, Craft::$app->request->getQueryStringWithoutPath(), $event->output);
                 }
             );
         }

@@ -22,7 +22,12 @@ use craft\elements\db\ElementQueryInterface;
  */
 class PageCacheAction extends ElementAction
 {
-    private const ACTION_RECREATE = 'recreate';
+    /**
+     * @deprecated since 2.0.0 - use PageCacheAction::ACTION_REFRESH
+     */
+    private const ACTION_RECREATE = 'refresh';
+ 
+    private const ACTION_REFRESH = 'refresh';
     private const ACTION_DELETE = 'delete';
 
     /**
@@ -81,13 +86,13 @@ JS, [static::class]);
         }
 
         if ($this->cache == self::ACTION_DELETE) {
-            PageCache::$plugin->pageCacheService->deletePageCacheWithQuery($entries);
+            PageCache::$plugin->deleteCacheService->deleteForElementWithQuery($entries);
         } else {
             if (!PageCache::$plugin->settings->enabled) {
                 return true;
             }
 
-            PageCache::$plugin->pageCacheService->recreatePageCaches($entries);
+            PageCache::$plugin->refreshCacheService->refreshForElements($entries);
         }
 
         $this->setMessage(\Craft::t('pagecache', 'Process page cache'));

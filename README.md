@@ -37,7 +37,7 @@ Go to _Settings_ → _Page Cache_ to setup the basic configuration options:
 - **Enabled caching**: Enable or disable the caching. Note: you need to delete the cache manually.
 - **Enable gzip compression**: Serve gzip compressed cached files.
 - **Enable brotli compression**: Serve brotli compressed cached files. Only works if the PHP brotli extension is installed.
-- **When globals are saved**: Choose what happens when globals got saved. Choose between "Renew cache", "Recreate cache (delete query)", "Delete cache"
+- **When globals are saved**: Choose what happens when globals got saved. Choose between "Refresh cache" & "Delete cache"
 - **Excluded URL's**: Define URL's which should **never** be cached (regex possible).
 - **Included URL's**: Define URL's which should **always** be cached (regex possible). This options overwrites the **Excluded URL's** option.
 - **Cache folder path**: Define a custom path, where cached files should be stored. Aliases (like `@webroot`) allowed.
@@ -58,7 +58,7 @@ The [brotli](resources/rewrite-rules/.htaccess.example.br) and [gzip](resources/
 - Go to _Settings_ → _Page Cache_
 - Enable caching and optionally customize the settings
 - As soon as a user visits a page, it got's cached.
-- Optional: go to _Entries_, mark all cachable entries (→ entries with URL's), and Choose _Create/Renew cache_
+- Optional: go to _Entries_, mark all cachable entries (→ entries with URL's), and Choose _Refresh cache_
 
 ## Delete Page Caches
 
@@ -74,12 +74,12 @@ Clear the whole page cache (this is the same as under _Utilities_):
 php craft clear-caches/pagecache
 ```
 
-Recreate existing page caches:
+Refresh cache:
 
 ```bash
-# Run `php craft pagecache/recreate --help` to see the possible arguments
+# Run `php craft pagecache/refresh --help` to see the possible arguments
 
-php craft pagecache/recreate
+php craft pagecache/refresh
 ```
 
 ## Page Cache Roadmap

@@ -47,14 +47,15 @@
         name: 'brotli'
 })|raw }}
 
+{% set globalSaveAction = settings['globalSaveAction'] == 'recreate' ? 'refresh' : settings['globalSaveAction'] %}
 {{ craft.cp.field(forms.select({
         id: 'globalSaveAction',
         name: 'globalSaveAction',
         options: [
-            { value: 'recreate', label: 'Renew cache'|t('pagecache') },
+            { value: 'refresh', label: 'Refresh cache'|t('pagecache') },
             { value: 'delete', label: 'Delete cache'|t('pagecache') },
         ],
-        value: settings['globalSaveAction'],
+        value: globalSaveAction,
     }), {
         label: 'When globals are saved'|t('pagecache'),
         id: 'globalSaveAction',
