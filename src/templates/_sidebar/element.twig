@@ -1,0 +1,40 @@
+<fieldset>
+    <legend class="h6">{{- "Page Cache"|t('pagecache') -}}</legend>
+    <div class="meta">
+        <div class="field">
+            <div class="heading">
+                <label for="status">{{- "Status"|t('site') -}}</label>
+            </div>
+            <div class="input ltr">
+                {{- isCached ? "Page is cached"|t('pagecache') : "Page is not cached"|t('pagecache') -}}
+            </div>
+        </div>
+
+        <div class="field">
+            <div class="heading">
+                <label for="refresh">{{- "Actions"|t('pagecache') -}}</label>
+            </div>
+            <div class="input ltr">
+                <form method="post" action="">
+                    {{- csrfInput() -}}
+                    <input type="hidden" name="action" value="pagecache/cache/refresh">
+                    <input type="hidden" name="entryId" value="{{- entry.id -}}">
+                    <button type="submit" id="refresh" class="btn small">
+                        {{- "Refresh cache"|t('pagecache') -}}
+                    </button>
+                </form>
+
+                &nbsp;&nbsp;
+
+                <form method="post" action="">
+                    {{- csrfInput() -}}
+                    <input type="hidden" name="action" value="pagecache/cache/delete">
+                    <input type="hidden" name="entryId" value="{{- entry.id -}}">
+                    <button type="submit" id="delete" class="btn small">
+                        {{- "Delete cache"|t('pagecache') -}}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</fieldset>

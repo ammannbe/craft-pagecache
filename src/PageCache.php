@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Page Cache plugin for Craft CMS
  *
@@ -30,6 +31,7 @@ use craft\web\twig\variables\CraftVariable;
 use craft\events\RegisterElementActionsEvent;
 use suhype\pagecache\services\PageCacheService;
 use craft\console\Application as ConsoleApplication;
+use craft\events\DefineHtmlEvent;
 use suhype\pagecache\elements\actions\PageCacheAction;
 use suhype\pagecache\services\CreateCacheService;
 use suhype\pagecache\services\DeleteCacheService;
@@ -127,6 +129,25 @@ class PageCache extends Plugin
 
     private function _registerElementEvents(): void
     {
+        Event::on(Element::class, Element::EVENT_DEFINE_SIDEBAR_HTML,
+            function(DefineHtmlEvent $event) {
+                /** @var Element $element */
+                $entry = $event->sender;
+
+                if (!$entry->uri || ElementHelper::isDraftOrRevision($entry)) {
+                    return;
+                }
+
+                $event->html .= Craft::$app->view->renderTemplate(
+                    'pagecache/_sidebar/element',
+                    [
+                        'entry' => $entry,
+                        'isCached' => $this->pageCacheService->isCached($entry),
+                    ]
+                );
+            },
+        );
+
         Event::on(
             Elements::class,
             Elements::EVENT_BEFORE_SAVE_ELEMENT,
@@ -211,7 +232,7 @@ class PageCache extends Plugin
         Event::on(
             Entry::class,
             Element::EVENT_REGISTER_ACTIONS,
-            function(RegisterElementActionsEvent $event) {
+            function (RegisterElementActionsEvent $event) {
                 [$type, $uid] = explode(':', $event->source) + [null, null];
 
                 if ($type == 'singles') {
@@ -235,8 +256,10 @@ class PageCache extends Plugin
 
     private function _registerClearCaches(): void
     {
-        Event::on(ClearCaches::class, ClearCaches::EVENT_REGISTER_CACHE_OPTIONS,
-            function(RegisterCacheOptionsEvent $event) {
+        Event::on(
+            ClearCaches::class,
+            ClearCaches::EVENT_REGISTER_CACHE_OPTIONS,
+            function (RegisterCacheOptionsEvent $event) {
                 $event->options[] = [
                     'key' => 'pagecache',
                     'label' => Craft::t('pagecache', 'Page Cache'),
@@ -292,7 +315,7 @@ class PageCache extends Plugin
             Event::on(
                 Application::class,
                 Application::EVENT_INIT,
-                function() {
+                function () {
                     $element = Craft::$app->getUrlManager()->getMatchedElement();
                     if ($element && $element->uri) {
                         $this->serveCacheService->serve($element, Craft::$app->request->getQueryStringWithoutPath());
@@ -308,15 +331,17 @@ class PageCache extends Plugin
         $this->_registerClearCaches();
 
         if (Craft::$app->request->getIsSiteRequest() && Craft::$app->request->getIsGet() && Craft::$app->user->isGuest) {
-            Event::on(View::class, View::EVENT_AFTER_RENDER_PAGE_TEMPLATE,
-                function(TemplateEvent $event) {
+            Event::on(
+                View::class,
+                View::EVENT_AFTER_RENDER_PAGE_TEMPLATE,
+                function (TemplateEvent $event) {
                     if (!Craft::$app->getResponse()->getIsOk()) {
                         return;
                     }
 
                     $element = Craft::$app->getUrlManager()->getMatchedElement();
 
-                    if (!$element) { 
+                    if (!$element) {
                         return;
                     }
 

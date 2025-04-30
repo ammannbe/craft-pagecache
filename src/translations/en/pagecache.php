@@ -30,4 +30,5 @@ return [
     'Excluded URL\'s' => 'Excluded URL\'s',
     'Included URL\'s' => 'Included URL\'s',
     'Cache folder path' => 'Cache folder path',
+    'Actions' => 'Actions',
 ];

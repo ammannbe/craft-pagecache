@@ -319,4 +319,9 @@ class PageCacheService extends Component
 
         return $entries;
     }
+
+    public function isCached(Element $element)
+    {
+        return $this->pageCacheFileExists($element) || $this->pageCacheRecordExists($element);
+    }
 }
