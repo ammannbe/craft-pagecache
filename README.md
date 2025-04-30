@@ -35,7 +35,6 @@ Page Cache is a Craft CMS plugin which can create static HTML files of your entr
 Go to _Settings_ → _Page Cache_ to setup the basic configuration options:
 
 - **Enabled caching**: Enable or disable the caching. Note: you need to delete the cache manually.
-- **Optimize HTML**: Minify and optimize HTML. Use with caution!
 - **Enable gzip compression**: Serve gzip compressed cached files.
 - **Enable brotli compression**: Serve brotli compressed cached files. Only works if the PHP brotli extension is installed.
 - **When globals are saved**: Choose what happens when globals got saved. Choose between "Renew cache", "Recreate cache (delete query)", "Delete cache"

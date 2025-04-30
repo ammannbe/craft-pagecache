@@ -24,7 +24,6 @@ return [
     'Delete cache' => 'Delete cache',
     'Note: You can\'t make changes, if the config file exists!' => 'Note: You can\'t make changes, if the config file exists!',
     'Enabled caching' => 'Enabled/Disable caching',
-    'Optimize HTML' => 'Optimize HTML',
     'Enable gzip compression' => 'Enable gzip compression',
     'Enable brotli compression' => 'Enable brotli compression',
     'When globals are saved' => 'When globals are saved',

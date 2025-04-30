@@ -37,7 +37,6 @@ class PageCacheService extends Component
         $this->enabled = PageCache::$plugin->settings->enabled;
         $this->gzip = PageCache::$plugin->settings->gzip;
         $this->brotli = PageCache::$plugin->settings->brotli && function_exists('brotli_compress');
-        $this->optimize = PageCache::$plugin->settings->optimize;
         $this->excludedUrls = PageCache::$plugin->settings->excludedUrls;
         $this->includedUrls = PageCache::$plugin->settings->includedUrls;
         $this->cacheFolderPath = Craft::getAlias(PageCache::$plugin->settings->cacheFolderPath);
@@ -49,7 +48,6 @@ class PageCacheService extends Component
     private $enabled;
     private $gzip;
     private $brotli;
-    private $optimize;
     private $excludedUrls;
     private $includedUrls;
     private $cacheFolderPath;
@@ -95,7 +93,7 @@ class PageCacheService extends Component
         return true;
     }
 
-    public function shouldCacheHtml(string $html): bool
+    private function shouldCacheHtml(string $html): bool
     {
         $html = stripslashes($html);
 
@@ -173,28 +171,6 @@ class PageCacheService extends Component
         return PageCacheRecord::find()
             ->where($condition)
             ->exists();
-    }
-
-    /**
-     * Thanks to @Rakesh Sankar https://stackoverflow.com/a/6225706
-     */
-    private function optimizeHtml($html): string
-    {
-        $search = [
-            '/\>[^\S ]+/s',      // strip whitespaces after tags, except space
-            '/[^\S ]+\</s',      // strip whitespaces before tags, except space
-            '/(\s)+/s',          // shorten multiple whitespace sequences
-            '/<!--(.|\s)*?-->/', // Remove HTML comments
-        ];
-
-        $replace = [
-            '>',
-            '<',
-            '\\1',
-            '',
-        ];
-
-        return preg_replace($search, $replace, $html);
     }
 
     /**
@@ -407,10 +383,6 @@ class PageCacheService extends Component
 
     public function createPageCacheFile(Element $element, ?string $query = null, string $html): void
     {
-        if ($this->optimize) {
-            $html = $this->optimizeHtml($html);
-        }
-
         $path = $this->parsePath($element, $query);
 
         if (!file_exists(dirname($path))) {
