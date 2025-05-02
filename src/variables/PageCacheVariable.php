@@ -13,6 +13,7 @@ namespace suhype\pagecache\variables;
 use Craft;
 use craft\web\View;
 use craft\helpers\Html;
+use Twig\Markup;
 
 class PageCacheVariable
 {
@@ -45,5 +46,10 @@ JS, View::POS_END);
         return Html::hiddenInput($tokenName, null, [
             'data-pagecache' => $rand,
         ]);
+    }
+
+    public function exclude(bool $exclude = true)
+    {
+        return new Markup('<!--[exclude]' . json_encode($exclude) . '[/exclude]-->', 'utf-8');
     }
 }

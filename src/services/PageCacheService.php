@@ -80,6 +80,19 @@ class PageCacheService extends Component
         return urldecode("{$this->cacheFolderPath}/{$baseUrl}/{$url}/index.html");
     }
 
+    protected function extractComment(string $tag, string $html)
+    {
+        // Match content between <!--[$tag]...[/$tag]-->
+        $pattern = '/<!--\[' . $tag . '\](.*?)\[\/' . $tag . '\]-->/s';
+    
+        if (preg_match($pattern, $html, $matches)) {
+            // Trim the result in case there is whitespace
+            return json_decode(trim($matches[1]), true);
+        }
+    
+        return null;
+    }
+
     protected function shouldCachePage(Element $element, ?string $query = null): bool
     {
         if (!$this->enabled) {
@@ -98,6 +111,10 @@ class PageCacheService extends Component
         $html = stripslashes($html);
 
         if (str_contains($html, 'assets/generate-transform')) {
+            return false;
+        }
+
+        if ($this->extractComment('exclude', $html)) {
             return false;
         }
 
