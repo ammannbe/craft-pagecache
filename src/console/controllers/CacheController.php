@@ -17,8 +17,8 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * Cache page cache
- * 
+ * Manage page cache
+ *
  * @author    Benjamin Ammann
  * @package   PageCache
  * @since     1.2.1
@@ -58,7 +58,7 @@ class CacheController extends Controller
     }
 
     /**
-     * Create page cache
+     * Create or refresh page cache
      *
      * @return int
      */
