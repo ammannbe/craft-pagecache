@@ -25,7 +25,7 @@ class CreateCacheService extends PageCacheService
 {
     private function getFooter(): string
     {
-        return '<!-- Cached by Page Cache on ' . gmdate('Y-m-d\TH:i:s') . ' -->';
+        return '<!-- Cached by Page Cache at ' . gmdate('Y-m-d\TH:i:s') . ' -->';
     }
 
     private function createPageCacheFile(Element $element, ?string $query = null, string $html): void
@@ -84,7 +84,7 @@ class CreateCacheService extends PageCacheService
                 'elementId' => $element->id,
                 'siteId'    => $element->getSite()->id,
                 'url'       => $this->parseUrl($element, $query),
-                'tags'      => $this->extractComment('tags', $html),
+                'tags'      => $this->parsePageCacheMetaTag('tags', $html),
             ]);
             return $pageCacheRecord->save();
         }

@@ -50,11 +50,17 @@ JS, View::POS_END);
 
     public function exclude(bool $exclude = true)
     {
-        return new Markup('<!--[exclude]' . json_encode($exclude) . '[/exclude]-->', 'utf-8');
+        Craft::$app->getView()->registerMetaTag([
+            'name' => 'pagecache:exclude',
+            'content' => $exclude ? 'true' : 'false',
+        ]);
     }
 
     public function tags(array $tags)
     {
-        return new Markup('<!--[tags]' . json_encode($tags) . '[/tags]-->', 'utf-8');
+        Craft::$app->getView()->registerMetaTag([
+            'name' => 'pagecache:tags',
+            'content' => implode(',', $tags),
+        ]);
     }
 }

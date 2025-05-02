@@ -80,14 +80,33 @@ class PageCacheService extends Component
         return urldecode("{$this->cacheFolderPath}/{$baseUrl}/{$url}/index.html");
     }
 
-    protected function extractComment(string $tag, string $html)
+    protected function parsePageCacheMetaTag(string $key, string $html)
     {
-        // Match content between <!--[$tag]...[/$tag]-->
-        $pattern = '/<!--\[' . $tag . '\](.*?)\[\/' . $tag . '\]-->/s';
-    
-        if (preg_match($pattern, $html, $matches)) {
-            // Trim the result in case there is whitespace
-            return json_decode(trim($matches[1]), true);
+        // Suppress parsing warnings for malformed HTML
+        libxml_use_internal_errors(true);
+
+        $dom = new \DOMDocument();
+        $dom->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
+
+        foreach ($dom->getElementsByTagName('meta') as $meta) {
+            if ($meta->getAttribute('name') !== "pagecache:{$key}") {
+                continue;
+            }
+
+            switch ($key) {
+                case 'exclude':
+                    return $meta->getAttribute('content') === 'true';
+                    break;
+
+                case 'tags':
+                    return explode(',', $meta->getAttribute('content'));
+                    break;
+
+                default:
+                    return $meta->getAttribute('content');
+                    break;
+            }
+
         }
     
         return null;
@@ -114,7 +133,7 @@ class PageCacheService extends Component
             return false;
         }
 
-        if ($this->extractComment('exclude', $html)) {
+        if ($this->parsePageCacheMetaTag('exclude', $html)) {
             return false;
         }
 
