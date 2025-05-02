@@ -16,10 +16,9 @@ use suhype\pagecache\PageCache;
 class Settings extends Model
 {
     public bool $enabled = false;
-    public bool $optimize = true;
     public bool $gzip = true;
     public bool $brotli = true;
-    public string $globalSaveAction = PageCache::GLOBAL_ACTION_RECREATE;
+    public string $globalSaveAction = PageCache::GLOBAL_ACTION_REFRESH;
     public array $excludedUrls = [];
     public array $includedUrls = [];
     public string $cacheFolderPath = '@webroot/pagecache';
@@ -30,8 +29,7 @@ class Settings extends Model
             ['excludedUrls', 'default', 'value' => []],
             ['includedUrls', 'default', 'value' => []],
             ['cacheFolderPath', 'default', 'value' => '@webroot/pagecache'],
-            [['enabled', 'optimize', 'gzip', 'brotli'], 'default', 'value' => true],
-            ['globalSaveAction', 'default', 'value' => PageCache::GLOBAL_ACTION_RECREATE],
+            ['globalSaveAction', 'default', 'value' => PageCache::GLOBAL_ACTION_REFRESH],
         ];
     }
 }

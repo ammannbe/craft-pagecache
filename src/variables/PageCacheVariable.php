@@ -13,6 +13,7 @@ namespace suhype\pagecache\variables;
 use Craft;
 use craft\web\View;
 use craft\helpers\Html;
+use Twig\Markup;
 
 class PageCacheVariable
 {
@@ -44,6 +45,22 @@ JS, View::POS_END);
         $tokenName = Craft::$app->getConfig()->getGeneral()->csrfTokenName;
         return Html::hiddenInput($tokenName, null, [
             'data-pagecache' => $rand,
+        ]);
+    }
+
+    public function exclude(bool $exclude = true)
+    {
+        Craft::$app->getView()->registerMetaTag([
+            'name' => 'pagecache:exclude',
+            'content' => $exclude ? 'true' : 'false',
+        ]);
+    }
+
+    public function tags(array $tags)
+    {
+        Craft::$app->getView()->registerMetaTag([
+            'name' => 'pagecache:tags',
+            'content' => implode(',', $tags),
         ]);
     }
 }

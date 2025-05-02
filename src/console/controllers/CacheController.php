@@ -17,18 +17,23 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * Recreate page cache
- * 
+ * Manage page cache
+ *
  * @author    Benjamin Ammann
  * @package   PageCache
  * @since     1.2.1
  */
-class RecreateController extends Controller
+class CacheController extends Controller
 {
     /**
      * @var int|null The site ID or NULL for all sites.
      */
     public ?int $siteId = null;
+
+    /**
+     * @var string|null The tags comma separated or NULL for all tags.
+     */
+    public ?string $tags = null;
 
     // Public Methods
     // =========================================================================
@@ -40,6 +45,12 @@ class RecreateController extends Controller
         switch ($actionID) {
             case 'index':
                 $options[] = 'siteId';
+                $options[] = 'tags';
+                break;
+
+            case 'delete':
+                $options[] = 'siteId';
+                $options[] = 'tags';
                 break;
         }
 
@@ -47,19 +58,38 @@ class RecreateController extends Controller
     }
 
     /**
-     * Recreate page cache
+     * Create or refresh page cache
      *
      * @return int
      */
     public function actionIndex()
     {
-        Console::output('Start the recreate page cache job...');
+        Console::output('Start the create cache job...');
 
         $siteId = $this->siteId ?? null;
+        $tags = explode(',', $this->tags) ?? null;
 
-        PageCache::$plugin->pageCacheService->recreateAllPageCaches($siteId);
+        PageCache::$plugin->refreshCacheService->refresh($siteId, $tags);
 
         Console::output('Job successfully queued and started.');
+        return ExitCode::OK;
+    }
+
+    /**
+     * Delete page cache
+     *
+     * @return int
+     */
+    public function actionDelete()
+    {
+        Console::output('Delete cache...');
+
+        $siteId = $this->siteId ?? null;
+        $tags = explode(',', $this->tags) ?? null;
+
+        PageCache::$plugin->deleteCacheService->delete($siteId, $tags);
+
+        Console::output('Done');
         return ExitCode::OK;
     }
 }

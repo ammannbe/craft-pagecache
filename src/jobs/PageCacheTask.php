@@ -51,7 +51,7 @@ class PageCacheTask extends BaseJob
             foreach ($queueRecords as $key => $queueRecord) {
                 $element = unserialize($queueRecord->element);
                 $query = explode('?', $queueRecord->url)[1] ?? null;
-                PageCache::$plugin->pageCacheService->deletePageCache($element, $query);
+                PageCache::$plugin->deleteCacheService->deleteForElement($element, $query);
 
                 if (!$queueRecord->delete) {
                     $promises[] = $client->getAsync($queueRecord->url);
