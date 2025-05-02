@@ -96,13 +96,24 @@ class DeleteCacheService extends PageCacheService
     /**
      * Delete complete cache
      */
-    public function delete(?int $siteId = null)
+    public function delete(?int $siteId = null, ?array $tags = null)
     {
+        $query = PageCacheRecord::find();
+
         if ($siteId !== null) {
-            $records = PageCacheRecord::find()->where(['siteId' => $siteId])->all();
-        } else {
-            $records = PageCacheRecord::find()->all();
+            $query = $query->where(['siteId' => $siteId]);
         }
+
+        if ($tags !== null) {
+            $tagsQuery = [];
+            foreach ($tags as $tag) {
+                $tagsQuery[] = ['like', 'tags', '"' . $tag . '"'];
+            }
+        
+            $query->andWhere(['or', ...$tagsQuery]);
+        }
+
+        $records = $query->all();
 
         $elements = [];
         foreach ($records as $record) {

@@ -47,6 +47,11 @@ class CacheController extends Controller
                 $options[] = 'siteId';
                 $options[] = 'tags';
                 break;
+
+            case 'delete':
+                $options[] = 'siteId';
+                $options[] = 'tags';
+                break;
         }
 
         return $options;
@@ -67,6 +72,24 @@ class CacheController extends Controller
         PageCache::$plugin->refreshCacheService->refresh($siteId, $tags);
 
         Console::output('Job successfully queued and started.');
+        return ExitCode::OK;
+    }
+
+    /**
+     * Delete page cache
+     *
+     * @return int
+     */
+    public function actionDelete()
+    {
+        Console::output('Delete cache...');
+
+        $siteId = $this->siteId ?? null;
+        $tags = explode(',', $this->tags) ?? null;
+
+        PageCache::$plugin->deleteCacheService->delete($siteId, $tags);
+
+        Console::output('Done');
         return ExitCode::OK;
     }
 }
