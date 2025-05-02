@@ -84,6 +84,7 @@ class CreateCacheService extends PageCacheService
                 'elementId' => $element->id,
                 'siteId'    => $element->getSite()->id,
                 'url'       => $this->parseUrl($element, $query),
+                'tags'      => $this->extractComment('tags', $html),
             ]);
             return $pageCacheRecord->save();
         }

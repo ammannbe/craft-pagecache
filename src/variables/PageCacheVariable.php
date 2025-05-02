@@ -52,4 +52,9 @@ JS, View::POS_END);
     {
         return new Markup('<!--[exclude]' . json_encode($exclude) . '[/exclude]-->', 'utf-8');
     }
+
+    public function tags(array $tags)
+    {
+        return new Markup('<!--[tags]' . json_encode($tags) . '[/tags]-->', 'utf-8');
+    }
 }

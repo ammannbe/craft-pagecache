@@ -30,6 +30,11 @@ class CacheController extends Controller
      */
     public ?int $siteId = null;
 
+    /**
+     * @var string|null The tags comma separated or NULL for all tags.
+     */
+    public ?string $tags = null;
+
     // Public Methods
     // =========================================================================
 
@@ -40,6 +45,7 @@ class CacheController extends Controller
         switch ($actionID) {
             case 'index':
                 $options[] = 'siteId';
+                $options[] = 'tags';
                 break;
         }
 
@@ -56,8 +62,9 @@ class CacheController extends Controller
         Console::output('Start the create cache job...');
 
         $siteId = $this->siteId ?? null;
+        $tags = explode(',', $this->tags) ?? null;
 
-        PageCache::$plugin->pageCacheService->CacheAllPageCaches($siteId);
+        PageCache::$plugin->refreshCacheService->refresh($siteId, $tags);
 
         Console::output('Job successfully queued and started.');
         return ExitCode::OK;
