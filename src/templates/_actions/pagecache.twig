@@ -18,16 +18,18 @@
     </div>
 </div>
 
-<div class="menu">
+<div class="menu pagecache-menu">
     <ul>
         <li>
-            <a class="formsubmit {{ not enabled ? 'disabled' }}" data-param="cache" data-value="refresh">
-                {{- "Refresh cache"|t('pagecache') -}}
+            <a class="formsubmit flex gap-xs {{ not enabled ? 'disabled' }}" data-param="cache" data-value="refresh">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw-icon lucide-refresh-cw"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                <span>{{- "Refresh cache"|t('pagecache') -}}</span>
             </a>
         </li>
         <li>
-            <a class="formsubmit error" data-param="cache" data-value="delete">
-                {{- "Delete cache"|t('pagecache') -}}
+            <a class="formsubmit error flex gap-xs" data-param="cache" data-value="delete">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash2-icon lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                <span>{{- "Delete cache"|t('pagecache') -}}</span>
             </a>
         </li>
     </ul>
@@ -47,5 +49,11 @@
         width: 20px;
         inset: 50%;
         transform: translate(-50%, -50%);
+    }
+
+    .pagecache-menu a:hover .lucide path {
+        stroke: currentColor !important;
+        stroke-width: 2px !important;
+        fill: unset !important;
     }
 </style>
