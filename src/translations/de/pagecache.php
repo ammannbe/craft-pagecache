@@ -29,6 +29,9 @@ return [
     'All sites' => 'Alle Seiten',
     'Excluded URL\'s' => 'Ausgeschlossene URL\'s',
     'Included URL\'s' => 'Eingeschlossene URL\'s',
+    'Page is cached' => 'Seite ist gecached',
+    'Page is not cached' => 'Seite ist nicht gecached',
     'Cache folder path' => 'Cache Ordner-Pfad',
+    'Create cache' => 'Cache erstellen',
     'Actions' => 'Aktionen',
 ];
