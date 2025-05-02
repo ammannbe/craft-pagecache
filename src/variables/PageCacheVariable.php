@@ -53,7 +53,7 @@ JS, View::POS_END);
         Craft::$app->getView()->registerMetaTag([
             'name' => 'pagecache:exclude',
             'content' => $exclude ? 'true' : 'false',
-        ]);
+        ], 'exclude');
     }
 
     public function tags(array $tags)
@@ -61,6 +61,6 @@ JS, View::POS_END);
         Craft::$app->getView()->registerMetaTag([
             'name' => 'pagecache:tags',
             'content' => implode(',', $tags),
-        ]);
+        ], 'tags');
     }
 }
