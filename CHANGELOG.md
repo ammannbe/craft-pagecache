@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.4.1 - 2025-05-02
+
+### Changed
+
+- Only Render meta tags once
+
 ## 1.4.0 - 2025-05-02
 
 ### Changed
