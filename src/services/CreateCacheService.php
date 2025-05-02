@@ -23,9 +23,17 @@ use suhype\pagecache\records\PageCacheRecord;
  */
 class CreateCacheService extends PageCacheService
 {
+    private function getFooter(): string
+    {
+        return '<!-- Cached by Page Cache on ' . gmdate('Y-m-d\TH:i:s') . ' -->';
+    }
+
     private function createPageCacheFile(Element $element, ?string $query = null, string $html): void
     {
         $path = $this->parsePath($element, $query);
+
+        $html .= $this->getFooter();
+
 
         if (!file_exists(dirname($path))) {
             mkdir(dirname($path), 0777, true);
