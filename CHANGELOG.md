@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.1.0 - 2025-05-02
+
+### Changed
+
+- improved plugin settings template
+- removed HTML optimization
+- refactor code
+- added sidebar html
+- updated pagecache action buttons
+- added page cache html footer
+- added "exclude" variable
+- added "tags" variable
+- added delete cache command
+
 ## 2.0.1 - 2025-04-14
 
 ### Fixed
@@ -16,6 +30,20 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 ### Changed
 
 - Craft CMS 5.x ready
+
+## 1.4.0 - 2025-05-02
+
+### Changed
+
+- improved plugin settings template
+- removed HTML optimization
+- refactor code
+- added sidebar html
+- updated pagecache action buttons
+- added page cache html footer
+- added "exclude" variable
+- added "tags" variable
+- added delete cache command
 
 ## 1.3.1 - 2025-04-14
 
