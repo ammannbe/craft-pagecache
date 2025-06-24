@@ -33,6 +33,19 @@ class PageCacheTask extends BaseJob
      */
     public int $concurrencies = 5;
 
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var int
+     */
+    private int $total = 0;
+
+    /**
+     * @var int
+     */
+    private int $processed = 0;
+
     // Public Methods
     // =========================================================================
 
@@ -50,14 +63,22 @@ class PageCacheTask extends BaseJob
             }
             $elements = Entry::find()->id($elementIds)->collect();
 
-            $total = count($queueRecords);
-            $processed = 0;
+            $this->total = count($queueRecords);
+            $this->processed = 0;
             $promises = [];
 
             /** @var PageCacheQueueRecord $queueRecord */
             foreach ($queueRecords as $key => $queueRecord) {
                 $element = $elements->where('id', json_decode($queueRecord->element)->id)->first();
                 $query = explode('?', $queueRecord->url)[1] ?? null;
+
+                if (!$element) {
+                    $queueRecord->delete();
+                    $this->updateProgress($queue);
+
+                    continue;
+                }
+
                 PageCache::$plugin->deleteCacheService->deleteForElement($element, $query);
 
                 if (!$queueRecord->delete) {
@@ -76,17 +97,25 @@ class PageCacheTask extends BaseJob
 
                 $queueRecord->delete();
 
-                $this->setProgress(
-                    $queue,
-                    $processed / $total,
-                    \Craft::t('app', '{step, number} of {total, number}', [
-                        'step' => $processed + 1,
-                        'total' => $total,
-                    ])
-                );
-                $processed++;
+                $this->updateProgress($queue);
             }
         }
+    }
+
+    // Private Methods
+    // =========================================================================
+
+    private function updateProgress($queue): void
+    {
+        $this->setProgress(
+            $queue,
+            $this->processed / $this->total,
+            \Craft::t('app', '{step, number} of {total, number}', [
+                'step' => $this->processed + 1,
+                'total' => $this->total,
+            ])
+        );
+        $this->processed++;
     }
 
     // Protected Methods
