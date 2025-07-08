@@ -286,7 +286,9 @@ class PageCacheService extends Component
 
     public function createCacheFolder()
     {
-        mkdir($this->cacheFolderPath, 0755, true);
+        if (!file_exists(dirname($this->cacheFolderPath))) {
+            mkdir($this->cacheFolderPath, 0755, true);
+        }
     }
 
     public function deleteCacheFolder()

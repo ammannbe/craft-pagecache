@@ -69,6 +69,7 @@ class Install extends Migration
                     'elementId' => $this->integer()->notNull(),
                     'siteId' => $this->integer()->notNull(),
                     'url' => $this->text()->notNull(),
+                    'tags' => $this->json(),
                     'dateCreated' => $this->dateTime()->notNull(),
                     'dateUpdated' => $this->dateTime()->notNull(),
                 ]
