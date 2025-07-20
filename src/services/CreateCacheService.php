@@ -13,6 +13,7 @@ namespace suhype\pagecache\services;
 
 use Craft;
 use craft\base\Element;
+use craft\elements\Entry;
 use suhype\pagecache\PageCache;
 use suhype\pagecache\records\PageCacheRecord;
 
@@ -68,6 +69,23 @@ class CreateCacheService extends PageCacheService
                 );
             }
         }
+    }
+
+    /**
+     * Delete and warm complete cache
+     * 
+     * @param int|null $siteId
+     * 
+     * @return ?bool
+     */
+    public function create($siteId = null, bool $queue = true): ?bool
+    {
+        $entries = Entry::find()
+            ->siteId($siteId ?? '*')
+            ->collect()
+            ->filter(fn (Entry $entry) => $entry->getUrl());
+
+        return $this->pushToQueue($entries->toArray());
     }
 
     public function createFromSiteRequest(Element $element, ?string $query = null, string $html): bool
