@@ -45,6 +45,10 @@ class CacheController extends Controller
         switch ($actionID) {
             case 'index':
                 $options[] = 'siteId';
+                break;
+
+            case 'refresh':
+                $options[] = 'siteId';
                 $options[] = 'tags';
                 break;
 
@@ -58,13 +62,30 @@ class CacheController extends Controller
     }
 
     /**
-     * Create or refresh page cache
+     * Delete existing page cache and warm all pages
      *
      * @return int
      */
     public function actionIndex()
     {
-        Console::output('Start the create cache job...');
+        Console::output('Start the warm cache job...');
+
+        $siteId = $this->siteId ?? null;
+
+        PageCache::$plugin->createCacheService->create($siteId);
+
+        Console::output('Job successfully queued and started.');
+        return ExitCode::OK;
+    }
+
+    /**
+     * Refresh already existing page cache
+     *
+     * @return int
+     */
+    public function actionRefresh()
+    {
+        Console::output('Start the refresh cache job...');
 
         $siteId = $this->siteId ?? null;
         $tags = explode(',', $this->tags) ?? null;
