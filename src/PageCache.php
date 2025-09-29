@@ -330,11 +330,15 @@ class PageCache extends Plugin
         $this->_registerActionEvents();
         $this->_registerClearCaches();
 
-        if (Craft::$app->request->getIsSiteRequest() && Craft::$app->request->getIsGet() && Craft::$app->user->isGuest) {
+        if (Craft::$app->request->getIsSiteRequest()) {
             Event::on(
                 View::class,
                 View::EVENT_AFTER_RENDER_PAGE_TEMPLATE,
                 function (TemplateEvent $event) {
+                    if (!Craft::$app->request->getIsGet() || !Craft::$app->user->isGuest) {
+                        return;
+                    }
+
                     if (!Craft::$app->getResponse()->getIsOk()) {
                         return;
                     }
