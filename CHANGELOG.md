@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.4.3 - 2026-02-13
+
+### Fixed
+
+- Fixed a logged warning
+- Saved entries kept being a draft
+
+## 1.4.2 - 2025-07-20
+
+### Changed
+
+- added command to warm up all entries
+
 ## 1.4.1 - 2025-05-02
 
 ### Changed
