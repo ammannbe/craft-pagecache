@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.2.0 - 2026-10-17
+
+### Added
+
+- Setting "Cache pages with query strings" (`cacheQueryStrings`), off by default
+- The queue job has a timeout per page request and is retried up to 3 times
+
+### Changed
+
+- Pages with query strings are no longer cached by default, every new query string created a new cache file
+- Cached pages are only served to guests, not to logged-in users
+- Previews and requests with a token are never cached or served from the cache
+- Saving an element with a changed URI (slug or parent) deletes the cache of the old URI
+- Saving a nested element (e.g. a Matrix or Neo block) refreshes the page of its owner
+- Bulk resaves no longer push pages into the cache queue
+- Cache files are written atomically, folders are created with `0755`
+- Fewer database queries when pushing pages into the queue
+- The rewrite examples skip the cache for logged-in users (`CraftSessionId` cookie)
+
+### Fixed
+
+- Query strings like `?a=/../../` could write cache files outside of the cache folder
+- A failed cache job blocked all later cache refreshes
+- `pagecache/cache/refresh` and `pagecache/cache/delete` without `--tags` did nothing
+- The cache job did not wait for all page requests, so some pages were not cached again
+- Elements of other sites than the primary site were not found by the cache job
+- Refreshing the cache crashed if a cached element was deleted, and duplicate elements were queued
+- Excluded/included URL patterns with `/` (e.g. `news/archive`) caused a PHP warning and never matched
+- The sidebar actions accepted GET requests, requests outside of the control panel and users without permission to save the element
+- The sidebar actions did not work in slideouts
+- The cache folder was not created on install
+- The brotli rewrite example used the wrong encoding name (`brotli` instead of `br`)
+- PHP 8 deprecation warnings for optional parameters before required ones
+- Console commands in the README
+
 ## 2.1.5 - 2026-10-17
 
 ### Fixed
