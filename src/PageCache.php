@@ -152,7 +152,8 @@ class PageCache extends Plugin
             Elements::class,
             Elements::EVENT_BEFORE_SAVE_ELEMENT,
             function (Event $event) {
-                if (!$event->element->uri || ElementHelper::isDraftOrRevision($event->element)) {
+                // New elements have no id yet, Entry::find()->id(null) would return any entry
+                if (!$event->element->id || !$event->element->uri || ElementHelper::isDraftOrRevision($event->element)) {
                     return;
                 }
 
@@ -185,6 +186,11 @@ class PageCache extends Plugin
             Elements::class,
             Elements::EVENT_AFTER_SAVE_ELEMENT,
             function (Event $event) {
+                // Drafts and revisions (including their nested blocks) never change a live page
+                if (ElementHelper::isDraftOrRevision($event->element)) {
+                    return;
+                }
+
                 $activeStates = [
                     Entry::STATUS_LIVE,
                     Element::STATUS_ENABLED,

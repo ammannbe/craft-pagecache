@@ -15,6 +15,7 @@ use suhype\pagecache\PageCache;
 
 use Craft;
 use craft\base\Element;
+use craft\helpers\Json;
 use craft\helpers\Queue;
 use craft\base\Component;
 use craft\elements\Entry;
@@ -241,6 +242,13 @@ class PageCacheService extends Component
         }
 
         foreach ($elements as $element) {
+            // Only store the reference: serializing the whole element walks all nested
+            // Matrix/Neo field values recursively and can hang the save request.
+            $elementReference = Json::encode([
+                'id' => $element->id,
+                'siteId' => $element->siteId,
+            ]);
+
             $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
             $url = str_replace(Element::HOMEPAGE_URI, '', $url);
 
@@ -254,7 +262,7 @@ class PageCacheService extends Component
                 }
 
                 $pageCacheQueueRecord = new PageCacheQueueRecord([
-                    'element' => $element,
+                    'element' => $elementReference,
                     'url'     => $queryRecord->url,
                     'delete'  => true,
                 ]);
@@ -262,7 +270,7 @@ class PageCacheService extends Component
             }
 
             $pageCacheQueueRecord = new PageCacheQueueRecord([
-                'element' => $element,
+                'element' => $elementReference,
                 'url'     => $url,
                 'delete'  => false,
             ]);
@@ -315,12 +323,12 @@ class PageCacheService extends Component
     public function getRelatedElements(Element $element)
     {
         $entries = [];
-        foreach (Entry::find()->relatedTo($element)->all() as $element) {
-            if (!$element->uri) {
+        foreach (Entry::find()->relatedTo($element)->all() as $relatedEntry) {
+            if (!$relatedEntry->uri) {
                 continue;
             }
 
-            $entries[$element->id] = $element;
+            $entries[$relatedEntry->id] = $relatedEntry;
         }
 
         if (class_exists('\benf\neo\elements\Block')) {
