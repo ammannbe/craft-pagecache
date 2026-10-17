@@ -29,84 +29,95 @@ class CreateCacheService extends PageCacheService
         return '<!-- Cached by Page Cache at ' . gmdate('Y-m-d\TH:i:s') . ' -->';
     }
 
-    private function createPageCacheFile(Element $element, ?string $query = null, string $html): void
+    /**
+     * Write to a temporary file first, so a rewrite rule never serves a half written file
+     */
+    private function writeFile(string $path, string $contents): bool
+    {
+        $tmpPath = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
+
+        if (@file_put_contents($tmpPath, $contents) !== false && @rename($tmpPath, $path)) {
+            return true;
+        }
+
+        @unlink($tmpPath);
+
+        Craft::error(
+            Craft::t('pagecache', 'Page Cache could not be written to "{path}"', ['path' => $path]),
+            __METHOD__
+        );
+
+        return false;
+    }
+
+    private function createPageCacheFile(Element $element, ?string $query, string $html): bool
     {
         $path = $this->parsePath($element, $query);
 
+        if ($path === null) {
+            return false;
+        }
+
         $html .= $this->getFooter();
 
-
-        if (!file_exists(dirname($path))) {
-            mkdir(dirname($path), 0777, true);
-        }
-        $hasWritten = file_put_contents($path, $html) !== false;
-
-        if (!$hasWritten) {
+        $dir = dirname($path);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
             Craft::error(
                 Craft::t('pagecache', 'Page Cache could not be written to "{path}"', ['path' => $path]),
                 __METHOD__
             );
+
+            return false;
+        }
+
+        if (!$this->writeFile($path, $html)) {
+            return false;
         }
 
         if ($this->gzip) {
-            $hasWritten = file_put_contents("{$path}.gz", gzencode($html, 6)) !== false;
-
-            if (!$hasWritten) {
-                Craft::error(
-                    Craft::t('pagecache', 'Page Cache could not be written to "{path}"', ['path' => $path]),
-                    __METHOD__
-                );
-            }
+            $this->writeFile("{$path}.gz", gzencode($html, 6));
         }
 
         if ($this->brotli) {
-            $hasWritten = file_put_contents("{$path}.br", brotli_compress($html)) !== false;
-
-            if (!$hasWritten) {
-                Craft::error(
-                    Craft::t('pagecache', 'Page Cache could not be written to "{path}"', ['path' => $path]),
-                    __METHOD__
-                );
-            }
+            $this->writeFile("{$path}.br", brotli_compress($html));
         }
+
+        return true;
     }
 
-    /**
-     * Delete and warm complete cache
-     * 
-     * @param int|null $siteId
-     * 
-     * @return ?bool
-     */
     public function create($siteId = null, bool $queue = true): ?bool
     {
         $entries = Entry::find()
             ->siteId($siteId ?? '*')
+            ->uri(':notempty:')
             ->collect()
             ->filter(fn (Entry $entry) => $entry->getUrl());
 
-        return $this->pushToQueue($entries->toArray());
+        $this->pushToQueue($entries->all());
+
+        return true;
     }
 
-    public function createFromSiteRequest(Element $element, ?string $query = null, string $html): bool
+    public function createFromSiteRequest(Element $element, ?string $query, string $html): bool
     {
         if (!$this->shouldCache($element, $query, $html)) {
             PageCache::$plugin->deleteCacheService->deleteForElement($element, $query);
             return false;
         }
 
-        $this->createPageCacheFile($element, $query, $html);
-
-        if (!$this->pageCacheRecordExists($element, $query)) {
-            $pageCacheRecord = new PageCacheRecord([
-                'elementId' => $element->id,
-                'siteId'    => $element->getSite()->id,
-                'url'       => $this->parseUrl($element, $query),
-                'tags'      => $this->parsePageCacheMetaTag('tags', $html),
-            ]);
-            return $pageCacheRecord->save();
+        if (!$this->createPageCacheFile($element, $query, $html)) {
+            return false;
         }
 
-        return true;
+        $condition = [
+            'url'    => $this->parseUrl($element, $query),
+            'siteId' => $element->getSite()->id,
+        ];
+
+        $pageCacheRecord = PageCacheRecord::findOne($condition) ?? new PageCacheRecord($condition);
+        $pageCacheRecord->elementId = $element->id;
+        $pageCacheRecord->tags = $this->parsePageCacheMetaTag('tags', $html);
+
+        return $pageCacheRecord->save();
     }
 }

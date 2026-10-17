@@ -47,7 +47,18 @@
         name: 'brotli'
 })|raw }}
 
-{% set globalSaveAction = settings['globalSaveAction'] == 'recreate' ? 'refresh' : settings['globalSaveAction'] %}
+{{ craft.cp.field(forms.lightswitch({
+        id: 'cacheQueryStrings',
+        name: 'cacheQueryStrings',
+        on: settings['cacheQueryStrings'],
+    }), {
+        label: 'Cache pages with query strings'|t('pagecache'),
+        instructions: "Every query string creates its own cache file. Included URL's are always cached."|t('pagecache'),
+        id: 'cacheQueryStrings',
+        name: 'cacheQueryStrings'
+})|raw }}
+
+{% set globalSaveAction =settings['globalSaveAction'] == 'recreate' ? 'refresh' : settings['globalSaveAction'] %}
 {{ craft.cp.field(forms.select({
         id: 'globalSaveAction',
         name: 'globalSaveAction',

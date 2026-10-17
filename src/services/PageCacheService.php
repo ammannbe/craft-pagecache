@@ -17,8 +17,10 @@ use Craft;
 use craft\base\Element;
 use craft\helpers\Json;
 use craft\helpers\Queue;
+use craft\models\Site;
 use craft\base\Component;
 use craft\elements\Entry;
+use craft\queue\Queue as CraftQueue;
 use craft\queue\QueueInterface;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
@@ -38,9 +40,10 @@ class PageCacheService extends Component
         $this->enabled = PageCache::$plugin->settings->enabled;
         $this->gzip = PageCache::$plugin->settings->gzip;
         $this->brotli = PageCache::$plugin->settings->brotli && function_exists('brotli_compress');
+        $this->cacheQueryStrings = PageCache::$plugin->settings->cacheQueryStrings;
         $this->excludedUrls = PageCache::$plugin->settings->excludedUrls;
         $this->includedUrls = PageCache::$plugin->settings->includedUrls;
-        $this->cacheFolderPath = Craft::getAlias(PageCache::$plugin->settings->cacheFolderPath);
+        $this->cacheFolderPath = rtrim(Craft::getAlias(PageCache::$plugin->settings->cacheFolderPath), '/');
     }
 
     // Protected Properties
@@ -49,6 +52,7 @@ class PageCacheService extends Component
     protected $enabled;
     protected $gzip;
     protected $brotli;
+    protected $cacheQueryStrings;
     protected $excludedUrls;
     protected $includedUrls;
     protected $cacheFolderPath;
@@ -65,52 +69,61 @@ class PageCacheService extends Component
         return '/' . $url;
     }
 
-    protected function parsePath(Element $element, ?string $query = null)
+    /**
+     * Path of the cache file, or null if the URL would leave the cache folder
+     */
+    protected function parsePath(Element $element, ?string $query = null): ?string
     {
-        $url = trim($this->parseUrl($element, $query), '/');
+        return $this->parsePathForSite($element->getSite(), $this->parseUrl($element, $query));
+    }
+
+    protected function parsePathForSite(Site $site, string $url): ?string
+    {
+        $url = trim($url, '/');
         $url = str_replace('?', '/@', $url);
-        $baseUrl = trim($element->getSite()->getBaseUrl(), '/');
+        $baseUrl = trim((string) $site->getBaseUrl(), '/');
         $baseUrl = str_replace('https://', '', $baseUrl);
         $baseUrl = str_replace('http://', '', $baseUrl);
         $baseUrl = explode(':', $baseUrl)[0];
 
-        if ($url === Element::HOMEPAGE_URI) {
-            $url = 'index';
+        $path = urldecode("{$baseUrl}/{$url}");
+
+        // Query strings like "?a=/../../" must not write outside of the cache folder
+        if (str_contains($path, "\0") || str_contains($path, '\\')) {
+            return null;
         }
 
-        return urldecode("{$this->cacheFolderPath}/{$baseUrl}/{$url}/index.html");
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '.' || $segment === '..') {
+                return null;
+            }
+        }
+
+        return "{$this->cacheFolderPath}/{$path}/index.html";
     }
 
     protected function parsePageCacheMetaTag(string $key, string $html)
     {
-        // Suppress parsing warnings for malformed HTML
-        libxml_use_internal_errors(true);
-
-        $dom = new \DOMDocument();
-        $dom->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_HTML_NODEFDTD | LIBXML_HTML_NOIMPLIED);
-
-        foreach ($dom->getElementsByTagName('meta') as $meta) {
-            if ($meta->getAttribute('name') !== "pagecache:{$key}") {
-                continue;
-            }
-
-            switch ($key) {
-                case 'exclude':
-                    return $meta->getAttribute('content') === 'true';
-                    break;
-
-                case 'tags':
-                    return explode(',', $meta->getAttribute('content'));
-                    break;
-
-                default:
-                    return $meta->getAttribute('content');
-                    break;
-            }
-
+        $pattern = '/<meta\b[^>]*\bname=["\']pagecache:' . preg_quote($key, '/') . '["\'][^>]*>/i';
+        if (!preg_match($pattern, $html, $tag)) {
+            return null;
         }
-    
-        return null;
+
+        $content = '';
+        if (preg_match('/\bcontent=["\']([^"\']*)["\']/i', $tag[0], $match)) {
+            $content = html_entity_decode($match[1], ENT_QUOTES);
+        }
+
+        switch ($key) {
+            case 'exclude':
+                return $content === 'true';
+
+            case 'tags':
+                return array_values(array_filter(array_map('trim', explode(',', $content)), 'strlen'));
+
+            default:
+                return $content;
+        }
     }
 
     protected function shouldCachePage(Element $element, ?string $query = null): bool
@@ -119,18 +132,25 @@ class PageCacheService extends Component
             return false;
         }
 
-        if ($this->isPathExcluded($element, $query) && !$this->isPathIncluded($element, $query)) {
+        if ($this->parsePath($element, $query) === null) {
             return false;
         }
 
-        return true;
+        if ($this->isPathIncluded($element, $query)) {
+            return true;
+        }
+
+        if ($query !== null && $query !== '' && !$this->cacheQueryStrings) {
+            return false;
+        }
+
+        return !$this->isPathExcluded($element, $query);
     }
 
     protected function shouldCacheHtml(string $html): bool
     {
-        $html = stripslashes($html);
-
-        if (str_contains($html, 'assets/generate-transform')) {
+        // Also matches JSON encoded URLs ("assets\/generate-transform")
+        if (str_contains($html, 'assets/generate-transform') || str_contains($html, 'assets\/generate-transform')) {
             return false;
         }
 
@@ -141,54 +161,43 @@ class PageCacheService extends Component
         return true;
     }
 
-    protected function shouldCache(Element $element, ?string $query = null, string $html): bool
+    protected function shouldCache(Element $element, ?string $query, string $html): bool
     {
         return $this->shouldCachePage($element, $query) && $this->shouldCacheHtml($html);
     }
 
     protected function isPathExcluded(Element $element, ?string $query = null): bool
     {
-        foreach ($this->excludedUrls as $excludedUrl) {
-            if (
-                isset($excludedUrl['siteId'])
-                && (!is_null($excludedUrl['siteId']) && !empty($excludedUrl['siteId']))
-                && $element->getSite()->id != $excludedUrl['siteId']
-            ) {
-                continue;
-            }
-
-            $url = ltrim($this->parseUrl($element, $query), '/');
-
-            if ($url == $excludedUrl['path']) {
-                return true;
-            }
-
-            if (preg_match("/{$excludedUrl['path']}/", urldecode($url))) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->matchesUrlPatterns($this->excludedUrls, $element, $query);
     }
 
     protected function isPathIncluded(Element $element, ?string $query = null): bool
     {
-        foreach ($this->includedUrls as $includedUrl) {
-            if (
-                isset($includedUrl['siteId'])
-                && (!is_null($includedUrl['siteId']) && !empty($includedUrl['siteId']))
-                && $element->getSite()->id != $includedUrl['siteId']
-            ) {
+        return $this->matchesUrlPatterns($this->includedUrls, $element, $query);
+    }
+
+    protected function matchesUrlPatterns(array $patterns, Element $element, ?string $query = null): bool
+    {
+        $url = ltrim($this->parseUrl($element, $query), '/');
+
+        foreach ($patterns as $pattern) {
+            $path = (string) ($pattern['path'] ?? '');
+
+            // An empty row would match every URL
+            if ($path === '') {
                 continue;
             }
 
-            $url = ltrim($this->parseUrl($element, $query), '/');
+            if (!empty($pattern['siteId']) && $element->getSite()->id != $pattern['siteId']) {
+                continue;
+            }
 
-            if ($url == $includedUrl['path']) {
+            if ($url === $path) {
                 return true;
             }
 
-            if (preg_match("/{$includedUrl['path']}/", urldecode($url))) {
+            // "#" as delimiter, so patterns like "news/archive" work without escaping "/"
+            if (@preg_match('#' . str_replace('#', '\#', $path) . '#', urldecode($url)) === 1) {
                 return true;
             }
         }
@@ -200,7 +209,7 @@ class PageCacheService extends Component
     {
         $path = $this->parsePath($element, $query);
 
-        return file_exists($path);
+        return $path !== null && file_exists($path);
     }
 
     protected function pageCacheRecordExists(Element $element, ?string $query = null)
@@ -223,25 +232,48 @@ class PageCacheService extends Component
         $url = $this->parseUrl($element);
 
         return PageCacheRecord::find()
-            ->where('`url` LIKE :query', ['query' => $url . '?%'])
-            ->andWhere('`url` != :url', ['url' => $url])
+            ->where(['like', 'url', addcslashes($url, '%_\\') . '?%', false])
             ->andWhere(['siteId' => $element->getSite()->id])
             ->all();
     }
 
+    protected function getQueueUrl(Element $element): ?string
+    {
+        $baseUrl = $element->getSite()->getBaseUrl();
+        $uri = Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
+
+        if ($baseUrl === null || !is_string($uri)) {
+            return null;
+        }
+
+        return str_replace(Element::HOMEPAGE_URI, '', $baseUrl . $uri);
+    }
+
     /**
      * Push $elements to queue
-     * 
-     * @param array<Element> $elements
+     *
+     * @param array<Element|null> $elements
      */
-    protected function pushToQueue(array $elements)
+    protected function pushToQueue(array $elements): void
     {
+        $elements = array_filter($elements);
+        if (empty($elements)) {
+            return;
+        }
+
         $queue = Craft::$app->getQueue();
         if (!$queue || !($queue instanceof QueueInterface)) {
             return;
         }
 
+        $queuedUrls = array_flip(PageCacheQueueRecord::find()->select('url')->column());
+
         foreach ($elements as $element) {
+            $url = $this->getQueueUrl($element);
+            if ($url === null || isset($queuedUrls[$url])) {
+                continue;
+            }
+
             // Only store the reference: serializing the whole element walks all nested
             // Matrix/Neo field values recursively and can hang the save request.
             $elementReference = Json::encode([
@@ -249,15 +281,8 @@ class PageCacheService extends Component
                 'siteId' => $element->siteId,
             ]);
 
-            $url = $element->getSite()->getBaseUrl() . Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
-            $url = str_replace(Element::HOMEPAGE_URI, '', $url);
-
-            if (PageCacheQueueRecord::find()->where(['url' => $url])->exists()) {
-                continue;
-            }
-
             foreach ($this->getPageCacheQueryRecords($element) as $queryRecord) {
-                if (PageCacheQueueRecord::find()->where(['url' => $queryRecord->url])->exists()) {
+                if (isset($queuedUrls[$queryRecord->url])) {
                     continue;
                 }
 
@@ -267,6 +292,7 @@ class PageCacheService extends Component
                     'delete'  => true,
                 ]);
                 $pageCacheQueueRecord->save();
+                $queuedUrls[$queryRecord->url] = true;
             }
 
             $pageCacheQueueRecord = new PageCacheQueueRecord([
@@ -275,26 +301,86 @@ class PageCacheService extends Component
                 'delete'  => false,
             ]);
             $pageCacheQueueRecord->save();
+            $queuedUrls[$url] = true;
         }
 
-        foreach ($queue->getJobInfo() as $job) {
-            $jobDetails = $queue->getJobDetails($job['id']);
+        if (!$this->hasPendingPageCacheTask($queue)) {
+            Queue::push(new PageCacheTask());
+        }
+    }
 
-            if ($jobDetails['job'] instanceof PageCacheTask) {
-                // Job is already running, abort.
-                return;
+    protected function hasPendingPageCacheTask(QueueInterface $queue): bool
+    {
+        foreach ($queue->getJobInfo() as $job) {
+            // A failed task never runs again, so it must not block a new one
+            if (($job['status'] ?? null) === CraftQueue::STATUS_FAILED) {
+                continue;
+            }
+
+            try {
+                $jobDetails = $queue->getJobDetails($job['id']);
+            } catch (\Throwable $e) {
+                // The job finished in the meantime
+                continue;
+            }
+
+            if (($jobDetails['job'] ?? null) instanceof PageCacheTask) {
+                return true;
             }
         }
 
-        Queue::push(new PageCacheTask());
+        return false;
+    }
+
+    /**
+     * The element with a URL that shows $element: itself, or the owner of a nested element
+     */
+    protected function resolvePageElement(?Element $element): ?Element
+    {
+        for ($depth = 0; $element && !$element->uri && $depth < 10; $depth++) {
+            if (!method_exists($element, 'getOwner')) {
+                return null;
+            }
+
+            try {
+                $element = $element->getOwner();
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        return $element && $element->uri ? $element : null;
     }
 
     // Public Methods
     // =========================================================================
 
+    /**
+     * Whether the current request may be served from or written to the cache
+     */
+    public function isCacheableRequest(): bool
+    {
+        $request = Craft::$app->getRequest();
+
+        if (
+            !$request->getIsSiteRequest()
+            || $request->getIsActionRequest()
+            || $request->getIsLivePreview()
+            || $request->getIsPreview()
+            || $request->getHadToken()
+            || !$request->getIsGet()
+            || $request->getIsAjax()
+        ) {
+            return false;
+        }
+
+        // Logged-in users may see personalized content
+        return Craft::$app->getUser()->getIsGuest();
+    }
+
     public function createCacheFolder()
     {
-        if (!file_exists(dirname($this->cacheFolderPath))) {
+        if (!file_exists($this->cacheFolderPath)) {
             mkdir($this->cacheFolderPath, 0755, true);
         }
     }
@@ -323,44 +409,32 @@ class PageCacheService extends Component
     public function getRelatedElements(Element $element)
     {
         $entries = [];
-        foreach (Entry::find()->relatedTo($element)->all() as $relatedEntry) {
-            if (!$relatedEntry->uri) {
-                continue;
+        $addEntry = function (?Element $relatedElement) use (&$entries) {
+            $page = $this->resolvePageElement($relatedElement);
+            if ($page) {
+                $entries[$page->id] = $page;
             }
+        };
 
-            $entries[$relatedEntry->id] = $relatedEntry;
+        foreach (Entry::find()->relatedTo($element)->siteId($element->siteId)->all() as $relatedEntry) {
+            $addEntry($relatedEntry);
         }
 
         if (class_exists('\benf\neo\elements\Block')) {
-            $neo = \benf\neo\elements\Block::find()->relatedTo($element)->all();
-            foreach ($neo as $el) {
-                $owner = $el->getOwner();
-                if (!$owner->uri) {
-                    continue;
-                }
-
-                $entries[$owner->id] = $owner;
+            foreach (\benf\neo\elements\Block::find()->relatedTo($element)->siteId($element->siteId)->all() as $block) {
+                $addEntry($block);
             }
         }
 
         if (class_exists('\verbb\supertable\elements\SuperTableBlockElement')) {
-            $supertable = \verbb\supertable\elements\SuperTableBlockElement::find()->relatedTo($element)->all();
-            foreach ($supertable as $el) {
-                $owner = $el->getOwner();
-                if (!$owner->uri) {
-                    continue;
-                }
-
-                $entries[$owner->id] = $owner;
+            foreach (\verbb\supertable\elements\SuperTableBlockElement::find()->relatedTo($element)->siteId($element->siteId)->all() as $block) {
+                $addEntry($block);
             }
         }
 
-        try {
-            $owner = $element->getOwner();
-            if ($owner && $owner->uri) {
-                $entries[$owner->id] = $owner;
-            }
-        } catch (\Exception $e) {
+        // Nested elements (e.g. Matrix entries) are shown on the page of their owner
+        if (!$element->uri) {
+            $addEntry($element);
         }
 
         return $entries;

@@ -37,9 +37,12 @@ Go to _Settings_ → _Page Cache_ to setup the basic configuration options:
 - **Enabled caching**: Enable or disable the caching. Note: you need to delete the cache manually.
 - **Enable gzip compression**: Serve gzip compressed cached files.
 - **Enable brotli compression**: Serve brotli compressed cached files. Only works if the PHP brotli extension is installed.
+- **Cache pages with query strings**: Off by default. Every query string (e.g. `?page=2`) creates its own cache file, so only enable it together with **Excluded URL's** or **Included URL's**.
 - **When globals are saved**: Choose what happens when globals got saved. Choose between "Refresh cache" & "Delete cache"
-- **Excluded URL's**: Define URL's which should **never** be cached (regex possible).
-- **Included URL's**: Define URL's which should **always** be cached (regex possible). This options overwrites the **Excluded URL's** option.
+- **Excluded URL's**: Define URL's which should **never** be cached (regex possible, `#` is used as delimiter, so `news/archive` works without escaping).
+- **Included URL's**: Define URL's which should **always** be cached (regex possible). This options overwrites the **Excluded URL's** and **Cache pages with query strings** options.
+
+Cached pages are only created and served for guests. Logged-in users, previews and requests with a token always get the live page.
 - **Cache folder path**: Define a custom path, where cached files should be stored. Aliases (like `@webroot`) allowed.
 
 ## Add rewrite rules rules
@@ -52,6 +55,8 @@ You can use the examples for .htaccess (with and without gzip/brotli compression
 - [resources/rewrite-rules/.htaccess.example.gzip](resources/rewrite-rules/.htaccess.example.gzip)
 
 The [brotli](resources/rewrite-rules/.htaccess.example.br) and [gzip](resources/rewrite-rules/.htaccess.example.gzip) compressions can be used together, separately or not at all. Just make sure to add them **before** the [normal rewrite rules](resources/rewrite-rules/.htaccess.example)
+
+The examples skip the cache for requests with a `CraftSessionId` cookie, so logged-in users get the live page. Adjust the cookie name if you changed `phpSessionName`. If **Cache pages with query strings** is off, you can remove the rules with `%{QUERY_STRING}` in the path.
 
 ## Using Page Cache
 
@@ -74,12 +79,23 @@ Clear the whole page cache (this is the same as under _Utilities_):
 php craft clear-caches/pagecache
 ```
 
-Refresh cache:
+Refresh all cached pages (optionally only for a site or for pages with one of the given tags):
 
 ```bash
-# Run `php craft pagecache/refresh --help` to see the possible arguments
+php craft pagecache/cache/refresh
+php craft pagecache/cache/refresh --siteId=1 --tags=news,events
+```
 
-php craft pagecache/refresh
+Delete cached pages (same options as `refresh`):
+
+```bash
+php craft pagecache/cache/delete --tags=news
+```
+
+Warm the cache of all entries with URL's:
+
+```bash
+php craft pagecache/cache
 ```
 
 ## Page Cache Roadmap

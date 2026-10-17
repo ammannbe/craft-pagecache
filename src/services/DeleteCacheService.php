@@ -22,50 +22,46 @@ use suhype\pagecache\records\PageCacheRecord;
  */
 class DeleteCacheService extends PageCacheService
 {
-    private function deletePageCacheFile(Element $element, ?string $query = null)
+    private function deletePageCacheFile(?string $path)
     {
-        $path = $this->parsePath($element, $query);
-
-        if (file_exists($path)) {
-            unlink($path);
+        if ($path === null) {
+            return;
         }
 
-        if (file_exists("{$path}.gz")) {
-            unlink("{$path}.gz");
-        }
-
-        if (file_exists("{$path}.br")) {
-            unlink("{$path}.br");
-        }
-
-        if (is_readable(dirname($path))) {
-            if (count(scandir(dirname($path))) == 2) {
-                rmdir(dirname($path));
+        foreach ([$path, "{$path}.gz", "{$path}.br"] as $file) {
+            if (file_exists($file)) {
+                unlink($file);
             }
         }
-    }
 
-    protected function deletePageCacheRecord(Element $element, ?string $query = null)
-    {
-        $condition = [
-            'url' => $this->parseUrl($element, $query),
-            'siteId' => $element->getSite()->id,
-        ];
-
-        return PageCacheRecord::find()
-            ->where($condition)
-            ->one()->delete();
+        $dir = dirname($path);
+        if (is_dir($dir) && count(scandir($dir)) == 2) {
+            @rmdir($dir);
+        }
     }
 
     public function deleteForElement(Element $element, ?string $query = null)
     {
-        if ($this->pageCacheFileExists($element, $query)) {
-            $this->deletePageCacheFile($element, $query);
+        $this->deletePageCacheFile($this->parsePath($element, $query));
+
+        PageCacheRecord::deleteAll([
+            'url' => $this->parseUrl($element, $query),
+            'siteId' => $element->getSite()->id,
+        ]);
+    }
+
+    /**
+     * Delete the cache file and record, also if the element does not exist anymore
+     */
+    public function deleteRecord(PageCacheRecord $record)
+    {
+        $site = Craft::$app->getSites()->getSiteById($record->siteId, true);
+
+        if ($site) {
+            $this->deletePageCacheFile($this->parsePathForSite($site, $record->url));
         }
 
-        if ($this->pageCacheRecordExists($element, $query)) {
-            $this->deletePageCacheRecord($element, $query);
-        }
+        $record->delete();
     }
 
     /**
@@ -75,20 +71,15 @@ class DeleteCacheService extends PageCacheService
      */
     public function deleteForElementWithQuery($element)
     {
-        $elements = [$element];
-        if (is_array($element)) {
-            $elements = $element;
-        }
+        $elements = array_filter(is_array($element) ? $element : [$element]);
 
         unset($element);
 
         foreach ($elements as $element) {
             $this->deleteForElement($element);
 
-            $records = $this->getPageCacheQueryRecords($element);
-            foreach ($records as $record) {
-                $query = explode('?', $record->url)[1];
-                $this->deleteForElement($element, $query);
+            foreach ($this->getPageCacheQueryRecords($element) as $record) {
+                $this->deleteRecord($record);
             }
         }
     }
@@ -101,28 +92,20 @@ class DeleteCacheService extends PageCacheService
         $query = PageCacheRecord::find();
 
         if ($siteId !== null) {
-            $query = $query->where(['siteId' => $siteId]);
+            $query->where(['siteId' => $siteId]);
         }
 
-        if ($tags !== null) {
+        if (!empty($tags)) {
             $tagsQuery = [];
             foreach ($tags as $tag) {
                 $tagsQuery[] = ['like', 'tags', '"' . $tag . '"'];
             }
-        
+
             $query->andWhere(['or', ...$tagsQuery]);
         }
 
-        $records = $query->all();
-
-        $elements = [];
-        foreach ($records as $record) {
-            $element = Craft::$app->elements->getElementById($record->elementId, null, $record->siteId);
-            if ($element) {
-                $elements[] = $element;
-            }
+        foreach ($query->all() as $record) {
+            $this->deleteRecord($record);
         }
-
-        $this->deleteForElementWithQuery($elements);
     }
 }

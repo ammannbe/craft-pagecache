@@ -16,7 +16,7 @@
 return [
     '{name} plugin loaded' => '{name} plugin loaded',
     'Page Cache' => 'Page Cache',
-    'Page Cache could not be written to "{filepath}"' => 'Page Cache could not be written to "{filepath}"',
+    'Page Cache could not be written to "{path}"' => 'Page Cache could not be written to "{path}"',
     'Process page cache' => 'Process page cache',
     'Refresh cache' => 'Refresh cache',
     'Delete cache' => 'Delete cache',
@@ -34,4 +34,6 @@ return [
     'Cache folder path' => 'Cache folder path',
     'Create cache' => 'Create cache',
     'Actions' => 'Actions',
+    'Cache pages with query strings' => 'Cache pages with query strings',
+    'Every query string creates its own cache file. Included URL\'s are always cached.' => 'Every query string creates its own cache file. Included URL\'s are always cached.',
 ];

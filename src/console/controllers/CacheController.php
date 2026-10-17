@@ -87,10 +87,7 @@ class CacheController extends Controller
     {
         Console::output('Start the refresh cache job...');
 
-        $siteId = $this->siteId ?? null;
-        $tags = explode(',', $this->tags) ?? null;
-
-        PageCache::$plugin->refreshCacheService->refresh($siteId, $tags);
+        PageCache::$plugin->refreshCacheService->refresh($this->siteId, $this->parseTags());
 
         Console::output('Job successfully queued and started.');
         return ExitCode::OK;
@@ -105,12 +102,22 @@ class CacheController extends Controller
     {
         Console::output('Delete cache...');
 
-        $siteId = $this->siteId ?? null;
-        $tags = explode(',', $this->tags) ?? null;
-
-        PageCache::$plugin->deleteCacheService->delete($siteId, $tags);
+        PageCache::$plugin->deleteCacheService->delete($this->siteId, $this->parseTags());
 
         Console::output('Done');
         return ExitCode::OK;
+    }
+
+    // Private Methods
+    // =========================================================================
+
+    /**
+     * Tags from --tags, or null for all pages
+     */
+    private function parseTags(): ?array
+    {
+        $tags = array_values(array_filter(array_map('trim', explode(',', (string) $this->tags)), 'strlen'));
+
+        return $tags ?: null;
     }
 }

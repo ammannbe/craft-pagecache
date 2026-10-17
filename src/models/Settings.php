@@ -19,6 +19,12 @@ class Settings extends Model
     public bool $gzip = true;
     public bool $brotli = true;
     public string $globalSaveAction = PageCache::GLOBAL_ACTION_REFRESH;
+
+    /**
+     * Cache pages with a query string. Every new query string creates a new cache file,
+     * so only enable this together with excluded/included URL's.
+     */
+    public bool $cacheQueryStrings = false;
     public array $excludedUrls = [];
     public array $includedUrls = [];
     public string $cacheFolderPath = '@webroot/pagecache';

@@ -13,6 +13,7 @@ namespace suhype\pagecache\services;
 
 use Craft;
 use craft\base\Element;
+use suhype\pagecache\PageCache;
 use suhype\pagecache\records\PageCacheRecord;
 
 /**
@@ -24,10 +25,10 @@ class RefreshCacheService extends PageCacheService
 {
     /**
      * Refresh cache of element(s)
-     * 
+     *
      * @param array<Element>|Element $element
      * @param bool $queue
-     * 
+     *
      * @return ?bool
      */
     public function refreshForElements($elements, bool $queue = true): ?bool
@@ -40,14 +41,16 @@ class RefreshCacheService extends PageCacheService
             $elements = [$elements];
         }
 
-        return $this->pushToQueue($elements);
+        $this->pushToQueue($elements);
+
+        return true;
     }
 
     /**
      * Refresh complete cache
-     * 
+     *
      * @param int|null $siteId
-     * 
+     *
      * @return ?bool
      */
     public function refresh($siteId = null, ?array $tags = null, bool $queue = true): ?bool
@@ -55,32 +58,38 @@ class RefreshCacheService extends PageCacheService
         $query = PageCacheRecord::find();
 
         if ($siteId !== null) {
-            $query = $query->where(['siteId' => $siteId]);
+            $query->where(['siteId' => $siteId]);
         }
 
-        if ($tags !== null) {
+        if (!empty($tags)) {
             $tagsQuery = [];
             foreach ($tags as $tag) {
                 $tagsQuery[] = ['like', 'tags', '"' . $tag . '"'];
             }
-        
+
             $query->andWhere(['or', ...$tagsQuery]);
         }
 
-        $records = $query->all();
-
-        /** @var array<Element> $elements */
+        /** @var array<string, Element> $elements */
         $elements = [];
-        foreach ($records as $record) {
-            $element = $elements[$record->elementId] ?? null;
-            if ($element && $element->siteId === $record->siteId) {
+        foreach ($query->all() as $record) {
+            $key = "{$record->elementId}:{$record->siteId}";
+            if (isset($elements[$key])) {
                 continue;
             }
 
             $element = Craft::$app->elements->getElementById($record->elementId, null, $record->siteId);
-            $elements[] = $element;
+
+            if (!$element) {
+                PageCache::$plugin->deleteCacheService->deleteRecord($record);
+                continue;
+            }
+
+            $elements[$key] = $element;
         }
 
-        return $this->pushToQueue($elements);
+        $this->pushToQueue(array_values($elements));
+
+        return true;
     }
 }

@@ -88,6 +88,16 @@ class PageCache extends Plugin
     public const GLOBAL_ACTION_REFRESH = 'refresh';
     public const GLOBAL_ACTION_DELETE = 'delete';
 
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * Elements before they are saved, keyed by "id:siteId"
+     *
+     * @var array<string, Element>
+     */
+    private array $previousElements = [];
+
     // Protected Methods
     // =========================================================================
 
@@ -152,16 +162,17 @@ class PageCache extends Plugin
             Elements::class,
             Elements::EVENT_BEFORE_SAVE_ELEMENT,
             function (Event $event) {
-                // New elements have no id yet, Entry::find()->id(null) would return any entry
-                if (!$event->element->id || !$event->element->uri || ElementHelper::isDraftOrRevision($event->element)) {
+                $element = $event->element;
+
+                // New elements have no id yet and no cached page
+                if (!$element->id || !$element->uri || $element->resaving || ElementHelper::isDraftOrRevision($element)) {
                     return;
                 }
 
-                // Check if the the old slug is not equal the new one
-                $element = Entry::find()->id($event->element->id)->one();
-                if ($element && $event->element->slug !== $element->slug) {
-                    $elements = $this->pageCacheService->getRelatedElements($element);
-                    $this->deleteCacheService->deleteForElementWithQuery([$element, ...$elements]);
+                // Remember the saved version, its cache must go if the URI changes (slug or parent)
+                $previous = Craft::$app->getElements()->getElementById($element->id, get_class($element), $element->siteId);
+                if ($previous && $previous->uri) {
+                    $this->previousElements["{$element->id}:{$element->siteId}"] = $previous;
                 }
             }
         );
@@ -170,6 +181,10 @@ class PageCache extends Plugin
             GlobalSet::class,
             GlobalSet::EVENT_AFTER_SAVE,
             function (Event $event) {
+                if ($event->sender->resaving) {
+                    return;
+                }
+
                 switch (PageCache::$plugin->settings->globalSaveAction) {
                     case PageCache::GLOBAL_ACTION_DELETE:
                         $this->deleteCacheService->delete($event->sender->siteId);
@@ -186,9 +201,20 @@ class PageCache extends Plugin
             Elements::class,
             Elements::EVENT_AFTER_SAVE_ELEMENT,
             function (Event $event) {
-                // Drafts and revisions (including their nested blocks) never change a live page
-                if (ElementHelper::isDraftOrRevision($event->element)) {
+                $savedElement = $event->element;
+
+                // Drafts and revisions (including their nested blocks) never change a live page,
+                // bulk resaves would push every page into the queue
+                if (ElementHelper::isDraftOrRevision($savedElement) || $savedElement->resaving) {
                     return;
+                }
+
+                $key = "{$savedElement->id}:{$savedElement->siteId}";
+                $previous = $this->previousElements[$key] ?? null;
+                unset($this->previousElements[$key]);
+
+                if ($previous && $previous->uri !== $savedElement->uri) {
+                    $this->deleteCacheService->deleteForElementWithQuery($previous);
                 }
 
                 $activeStates = [
@@ -196,14 +222,15 @@ class PageCache extends Plugin
                     Element::STATUS_ENABLED,
                 ];
 
-                $elements = $this->pageCacheService->getRelatedElements($event->element);
-                $elements[$event->element->id] = $event->element;
+                $elements = $this->pageCacheService->getRelatedElements($savedElement);
+                $elements[$savedElement->id] = $savedElement;
 
                 $toDelete = [];
                 $toRefresh = [];
 
                 foreach ($elements as $element) {
-                    if (!$element->uri || ElementHelper::isDraftOrRevision($element) || $element->propagating || $element->resaving) {
+                    // The owner of a nested element can be in a bulk resave as well
+                    if (!$element->uri || ElementHelper::isDraftOrRevision($element) || $element->resaving) {
                         continue;
                     }
 
@@ -341,7 +368,7 @@ class PageCache extends Plugin
                 View::class,
                 View::EVENT_AFTER_RENDER_PAGE_TEMPLATE,
                 function (TemplateEvent $event) {
-                    if (!Craft::$app->request->getIsGet() || !Craft::$app->user->isGuest) {
+                    if (!$this->pageCacheService->isCacheableRequest()) {
                         return;
                     }
 

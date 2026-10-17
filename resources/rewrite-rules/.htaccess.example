@@ -4,11 +4,14 @@
     [...] # Other config/rewrite rules
 
     # PageCache rewrites
+    # Logged-in users (Craft session cookie) always get the live page
     RewriteCond %{REQUEST_METHOD} =GET
+    RewriteCond %{HTTP_COOKIE} !CraftSessionId
     RewriteCond %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/\@%{QUERY_STRING}/index.html -s
     RewriteRule .* %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/\@%{QUERY_STRING}/index.html [L]
 
     RewriteCond %{REQUEST_METHOD} =GET
+    RewriteCond %{HTTP_COOKIE} !CraftSessionId
     RewriteCond %{QUERY_STRING} ^$
     RewriteCond %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/index.html -s
     RewriteRule .* %{DOCUMENT_ROOT}/pagecache/%{HTTP_HOST}/%{REQUEST_URI}/index.html [L]

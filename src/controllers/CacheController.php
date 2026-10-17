@@ -3,8 +3,11 @@
 namespace suhype\pagecache\controllers;
 
 use Craft;
+use craft\base\ElementInterface;
 use craft\web\Controller;
 use suhype\pagecache\PageCache;
+use yii\web\ForbiddenHttpException;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 /**
@@ -16,32 +19,52 @@ class CacheController extends Controller
     protected array|int|bool $allowAnonymous = self::ALLOW_ANONYMOUS_NEVER;
 
     /**
-     * pagecache/cache action
+     * @inheritdoc
      */
-    public function actionRefresh()
+    public function beforeAction($action): bool
     {
-        $entryId = Craft::$app->request->getBodyParam('entryId');
-        if (!$entryId) {
-            Craft::$app->end();
-        }
+        $this->requirePostRequest();
+        $this->requireCpRequest();
 
-        $element = Craft::$app->elements->getElementById($entryId, null);
-
-        PageCache::$plugin->refreshCacheService->refreshForElements($element);
+        return parent::beforeAction($action);
     }
 
     /**
-     * pagecache/cache action
+     * pagecache/cache/refresh action
      */
-    public function actionDelete()
+    public function actionRefresh(): Response
     {
-        $entryId = Craft::$app->request->getBodyParam('entryId');
-        if (!$entryId) {
-            Craft::$app->end();
+        PageCache::$plugin->refreshCacheService->refreshForElements($this->getElement());
+
+        return $this->asSuccess();
+    }
+
+    /**
+     * pagecache/cache/delete action
+     */
+    public function actionDelete(): Response
+    {
+        PageCache::$plugin->deleteCacheService->deleteForElementWithQuery($this->getElement());
+
+        return $this->asSuccess();
+    }
+
+    private function getElement(): ElementInterface
+    {
+        $elementId = (int) $this->request->getRequiredBodyParam('entryId');
+        $siteId = $this->request->getBodyParam('siteId');
+
+        $element = Craft::$app->getElements()->getElementById($elementId, null, $siteId ? (int) $siteId : null);
+
+        if (!$element) {
+            throw new NotFoundHttpException('Element not found');
         }
 
-        $element = Craft::$app->elements->getElementById($entryId, null);
+        // Only users who may edit the element can change its cache
+        if (!Craft::$app->getElements()->canSave($element)) {
+            throw new ForbiddenHttpException('User not authorized to change the cache of this element.');
+        }
 
-        PageCache::$plugin->deleteCacheService->deleteForElementWithQuery($element);
+        return $element;
     }
 }

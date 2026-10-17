@@ -13,6 +13,7 @@ namespace suhype\pagecache\services;
 
 use Craft;
 use craft\base\Element;
+use craft\web\Response;
 use suhype\pagecache\PageCache;
 
 /**
@@ -22,46 +23,12 @@ use suhype\pagecache\PageCache;
  */
 class ServeCacheService extends PageCacheService
 {
-    private function shouldCacheRequest(): bool
-    {
-        if (Craft::$app->request->getIsCpRequest()) {
-            return false;
-        }
-
-        if (Craft::$app->request->getIsActionRequest()) {
-            return false;
-        }
-
-        if (Craft::$app->request->getIsLivePreview()) {
-            return false;
-        }
-
-        if (!Craft::$app->request->getIsGet()) {
-            return false;
-        }
-
-        if (Craft::$app->request->getIsAjax()) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private function getPageCacheFileContents(Element $element, ?string $query = null)
-    {
-        $path = $this->parsePath($element, $query);
-
-        return file_get_contents($path);
-    }
-
     /**
-     * Serve cache if exists
-     *
-     * @return ?bool
+     * Send the cached page and end the request, if there is one
      */
-    public function serve(Element $element, ?string $query = null): ?bool
+    public function serve(Element $element, ?string $query = null): bool
     {
-        if (!$this->shouldCacheRequest()) {
+        if (!$this->isCacheableRequest()) {
             return false;
         }
 
@@ -69,12 +36,20 @@ class ServeCacheService extends PageCacheService
             return false;
         }
 
-        if (!$this->pageCacheFileExists($element, $query)) {
+        $path = $this->parsePath($element, $query);
+        $html = is_file($path) ? @file_get_contents($path) : false;
+
+        if ($html === false) {
+            // Remove a record without file, so the page gets cached again
             PageCache::$plugin->deleteCacheService->deleteForElement($element, $query);
             return false;
         }
 
-        Craft::$app->response->data = $this->getPageCacheFileContents($element, $query);
+        $response = Craft::$app->getResponse();
+        $response->format = Response::FORMAT_HTML;
+        $response->data = $html;
         Craft::$app->end();
+
+        return true;
     }
 }
