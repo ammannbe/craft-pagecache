@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.1.5 - 2026-10-17
+
+### Fixed
+
+- Saving an entry with nested Neo or Matrix blocks hung until the request timed out, so the entry was not saved and the cache was not refreshed
+- Saving drafts and revisions no longer triggers a cache refresh
+- Saving a new element could delete the cache of an unrelated entry
+- Related elements were resolved from the wrong element when collecting Neo and Super Table owners
+
 ## 2.1.4 - 2025-09-29
 
 ### Fixed
