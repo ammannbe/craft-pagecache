@@ -13,11 +13,12 @@
 ] %}
 
 {# Inputs are namespaced with "settings", so are the IDs of the tab panes #}
+{# The keys are the IDs of the panes, Craft toggles the pane with the ID of the selected tab #}
 {% set tabs = {
-    general: { label: 'General'|t('pagecache'), url: '#settings-pagecache-general' },
-    pages: { label: 'Pages'|t('pagecache'), url: '#settings-pagecache-pages' },
-    files: { label: 'Cache files'|t('pagecache'), url: '#settings-pagecache-files' },
-    generate: { label: 'Generating pages'|t('pagecache'), url: '#settings-pagecache-generate' },
+    'settings-pagecache-general': { label: 'General'|t('pagecache'), url: '#settings-pagecache-general' },
+    'settings-pagecache-pages': { label: 'Pages'|t('pagecache'), url: '#settings-pagecache-pages' },
+    'settings-pagecache-files': { label: 'Cache files'|t('pagecache'), url: '#settings-pagecache-files' },
+    'settings-pagecache-generate': { label: 'Generating pages'|t('pagecache'), url: '#settings-pagecache-generate' },
 } %}
 
 {% set formActions = [
