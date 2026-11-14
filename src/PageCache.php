@@ -92,6 +92,14 @@ class PageCache extends Plugin
     public bool $hasCpSettings = true;
 
     /**
+     * Show the settings (read-only) when admin changes are disallowed. Craft only sets this automatically
+     * for plugins with the default settings page, ours has tabs.
+     *
+     * @var bool
+     */
+    public bool $hasReadOnlyCpSettings = true;
+
+    /**
      * @var bool
      */
     public bool $hasCpSection = false;
