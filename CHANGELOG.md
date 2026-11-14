@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.2.1 - 2026-11-14
+
+### Added
+
+- nginx rewrite example (`resources/rewrite-rules/nginx.conf.example`)
+- README: excluding pages, tags and how `Cache-Control` headers relate to the page cache
+
+### Fixed
+
+- Paginated URLs (e.g. `news/p2`) overwrote and were served the cache of the page itself (`news`)
+- Changing the URI of an element (slug or parent) left the cache of the pages below it at the old URLs
+- Clearing the whole cache (utility, console, globals) left files without database record (e.g. after a database import), which the rewrite rules kept serving
+- Non-HTML responses (e.g. `sitemap.xml` templates, `{% header "Content-Type: …" %}`) were cached and served as HTML
+- Pages that used a CSRF token while rendering (`csrfInput()` without `async`, `craft.app.request.csrfToken`) were cached, so forms failed for every other visitor; a warning is logged instead
+- Uninstalling the plugin could delete a non-dedicated folder (e.g. `@webroot`) if it was set as cache folder
+- Uninstalling the plugin did not drop the queue table
+- The sidebar actions reloaded the page and discarded unsaved changes
+- Uncached or excluded pages ran a `DELETE` query on every guest request
+
 ## 2.2.0 - 2026-10-17
 
 ### Added
