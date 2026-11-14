@@ -12,8 +12,8 @@ namespace suhype\pagecache\migrations;
 
 use Craft;
 use craft\db\Migration;
-use suhype\pagecache\records\PageCacheQueueRecord;
-use suhype\pagecache\records\PageCacheRecord;
+use craft\db\Table as CraftTable;
+use suhype\pagecache\db\Table;
 
 /**
  * @author    Benjamin Ammann
@@ -22,100 +22,120 @@ use suhype\pagecache\records\PageCacheRecord;
  */
 class Install extends Migration
 {
-    // Public Properties
-    // =========================================================================
-
-    // Public Methods
-    // =========================================================================
-
     /**
      * @inheritdoc
      */
     public function safeUp()
     {
-        if ($this->createTables()) {
-            $this->addForeignKeys();
-            // Refresh the db schema caches
-            Craft::$app->db->schema->refresh();
+        if (!$this->db->tableExists(Table::CACHES)) {
+            $this->createTable(Table::CACHES, [
+                'id' => $this->primaryKey(),
+                'uid' => $this->uid(),
+                'elementId' => $this->integer()->notNull(),
+                'siteId' => $this->integer()->notNull(),
+                'url' => $this->text()->notNull(),
+                'tags' => $this->json(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+            ]);
+
+            $this->addForeignKey(null, Table::CACHES, 'siteId', CraftTable::SITES, 'id', 'CASCADE', 'CASCADE');
         }
+
+        self::createCacheIndexes($this);
+        self::createQueueTable($this);
+        self::createTrackingTables($this);
+
+        Craft::$app->db->schema->refresh();
 
         return true;
     }
 
-   /**
+    /**
      * @inheritdoc
      */
     public function safeDown()
     {
-        $this->removeTables();
+        $this->dropTableIfExists(Table::CACHE_QUERIES);
+        $this->dropTableIfExists(Table::QUERIES);
+        $this->dropTableIfExists(Table::ELEMENTS);
+        $this->dropTableIfExists(Table::QUEUE);
+        $this->dropTableIfExists(Table::CACHES);
 
         return true;
     }
 
-    // Protected Methods
+    // Shared with update migrations
     // =========================================================================
 
-    /**
-     * @return bool
-     */
-    protected function createTables()
+    public static function createCacheIndexes(Migration $migration): void
     {
-        if (!$this->db->tableExists(PageCacheRecord::tableName())) {
-            $this->createTable(
-                PageCacheRecord::tableName(),
-                [
-                    'id' => $this->primaryKey(),
-                    'uid' => $this->uid(),
-                    'elementId' => $this->integer()->notNull(),
-                    'siteId' => $this->integer()->notNull(),
-                    'url' => $this->text()->notNull(),
-                    'tags' => $this->json(),
-                    'dateCreated' => $this->dateTime()->notNull(),
-                    'dateUpdated' => $this->dateTime()->notNull(),
-                ]
-            );
-        }
-
-        if (!$this->db->tableExists(PageCacheQueueRecord::tableName())) {
-            $this->createTable(
-                PageCacheQueueRecord::tableName(),
-                [
-                    'id' => $this->primaryKey(),
-                    'uid' => $this->uid(),
-                    'element' => $this->binary(),
-                    'url' => $this->string(2048),
-                    'delete' => $this->boolean()->notNull(),
-                    'dateCreated' => $this->dateTime()->notNull(),
-                    'dateUpdated' => $this->dateTime()->notNull(),
-                ]
-            );
-        }
-
-        return true;
+        $migration->createIndex(null, Table::CACHES, ['elementId', 'siteId']);
     }
 
-    /**
-     * @return void
-     */
-    protected function addForeignKeys()
+    public static function createQueueTable(Migration $migration): void
     {
-        $this->addForeignKey(
-            $this->db->getForeignKeyName(PageCacheRecord::tableName(), 'siteId'),
-            PageCacheRecord::tableName(),
-            'siteId',
-            '{{%sites}}',
-            'id',
-            'CASCADE',
-            'CASCADE'
-        );
+        if ($migration->db->tableExists(Table::QUEUE)) {
+            return;
+        }
+
+        $migration->createTable(Table::QUEUE, [
+            'id' => $migration->primaryKey(),
+            'uid' => $migration->uid(),
+            'elementId' => $migration->integer(),
+            'siteId' => $migration->integer(),
+            'url' => $migration->string(2048),
+            'urlHash' => $migration->char(32)->notNull(),
+            'delete' => $migration->boolean()->notNull()->defaultValue(false),
+            'check' => $migration->boolean()->notNull()->defaultValue(false),
+            // Set by the queue job while it processes the row, reset when the page is queued again
+            'claimed' => $migration->boolean()->notNull()->defaultValue(false),
+            'dateCreated' => $migration->dateTime()->notNull(),
+            'dateUpdated' => $migration->dateTime()->notNull(),
+        ]);
+
+        // The same page is only queued once
+        $migration->createIndex(null, Table::QUEUE, ['urlHash'], true);
     }
 
-    /**
-     * @return void
-     */
-    protected function removeTables()
+    public static function createTrackingTables(Migration $migration): void
     {
-        $this->dropTableIfExists(PageCacheQueueRecord::tableName());
-        $this->dropTableIfExists(PageCacheRecord::tableName());
+        if (!$migration->db->tableExists(Table::ELEMENTS)) {
+            $migration->createTable(Table::ELEMENTS, [
+                'id' => $migration->primaryKey(),
+                'cacheId' => $migration->integer()->notNull(),
+                'elementId' => $migration->integer()->notNull(),
+            ]);
+
+            $migration->createIndex(null, Table::ELEMENTS, ['cacheId', 'elementId'], true);
+            $migration->createIndex(null, Table::ELEMENTS, ['elementId']);
+            $migration->addForeignKey(null, Table::ELEMENTS, 'cacheId', Table::CACHES, 'id', 'CASCADE', 'CASCADE');
+            $migration->addForeignKey(null, Table::ELEMENTS, 'elementId', CraftTable::ELEMENTS, 'id', 'CASCADE', 'CASCADE');
+        }
+
+        if (!$migration->db->tableExists(Table::QUERIES)) {
+            $migration->createTable(Table::QUERIES, [
+                'id' => $migration->primaryKey(),
+                'hash' => $migration->char(32)->notNull(),
+                'type' => $migration->string()->notNull(),
+                'params' => $migration->mediumText()->notNull(),
+            ]);
+
+            $migration->createIndex(null, Table::QUERIES, ['hash'], true);
+            $migration->createIndex(null, Table::QUERIES, ['type']);
+        }
+
+        if (!$migration->db->tableExists(Table::CACHE_QUERIES)) {
+            $migration->createTable(Table::CACHE_QUERIES, [
+                'id' => $migration->primaryKey(),
+                'cacheId' => $migration->integer()->notNull(),
+                'queryId' => $migration->integer()->notNull(),
+            ]);
+
+            $migration->createIndex(null, Table::CACHE_QUERIES, ['cacheId', 'queryId'], true);
+            $migration->createIndex(null, Table::CACHE_QUERIES, ['queryId']);
+            $migration->addForeignKey(null, Table::CACHE_QUERIES, 'cacheId', Table::CACHES, 'id', 'CASCADE', 'CASCADE');
+            $migration->addForeignKey(null, Table::CACHE_QUERIES, 'queryId', Table::QUERIES, 'id', 'CASCADE', 'CASCADE');
+        }
     }
 }

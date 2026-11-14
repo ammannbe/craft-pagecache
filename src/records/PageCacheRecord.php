@@ -21,6 +21,8 @@ use craft\db\ActiveRecord;
  * @property  int $elementId
  * @property  int $siteId
  * @property  string $url
+ * @property  array|null $tags
+ * @property  \DateTime $dateUpdated
  */
 class PageCacheRecord extends ActiveRecord
 {

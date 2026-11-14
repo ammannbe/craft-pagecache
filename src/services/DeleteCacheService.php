@@ -51,6 +51,50 @@ class DeleteCacheService extends PageCacheService
     }
 
     /**
+     * Delete the cache file and record of a page by its URL (e.g. "/news?page=2")
+     */
+    public function deleteUrl(int $siteId, string $url): void
+    {
+        $site = Craft::$app->getSites()->getSiteById($siteId, true);
+
+        if ($site) {
+            $this->deletePageCacheFile($this->parsePathForSite($site, $url));
+        }
+
+        PageCacheRecord::deleteAll([
+            'url' => $url,
+            'siteId' => $siteId,
+        ]);
+    }
+
+    /**
+     * Delete the cache files and records of many pages with one query per site
+     *
+     * @param array<array{siteId: int, url: string}> $pages
+     */
+    public function deleteUrls(array $pages): void
+    {
+        $urlsBySite = [];
+        foreach ($pages as $page) {
+            $urlsBySite[(int) $page['siteId']][$page['url']] = $page['url'];
+        }
+
+        foreach ($urlsBySite as $siteId => $urls) {
+            $site = Craft::$app->getSites()->getSiteById($siteId, true);
+
+            if ($site) {
+                foreach ($urls as $url) {
+                    $this->deletePageCacheFile($this->parsePathForSite($site, $url));
+                }
+            }
+
+            foreach (array_chunk(array_values($urls), 500) as $chunk) {
+                PageCacheRecord::deleteAll(['siteId' => $siteId, 'url' => $chunk]);
+            }
+        }
+    }
+
+    /**
      * Delete the cache file and record, also if the element does not exist anymore
      */
     public function deleteRecord(PageCacheRecord $record)

@@ -1,0 +1,20 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Page Cache'|t('pagecache') %}
+{% set selectedSubnavItem = 'pagecache' %}
+
+{# Layout tabs, same as on settings pages #}
+{% set tabs = pagecacheTabs %}
+
+{% block actionButton %}
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('pagecache/utility/refresh') }}
+        {{ redirectInput('pagecache') }}
+        <button type="submit" class="btn submit">{{ 'Refresh cache'|t('pagecache') }}</button>
+    </form>
+{% endblock %}
+
+{% block content %}
+    {% include 'pagecache/_utility/_content' with { layoutTabs: true } %}
+{% endblock %}

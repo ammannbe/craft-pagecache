@@ -23,6 +23,11 @@ use craft\web\Response;
 class ServeCacheService extends PageCacheService
 {
     /**
+     * Added to pages served by the plugin (not by the rewrite rules)
+     */
+    public const HEADER = 'X-Page-Cache';
+
+    /**
      * Send the cached page and end the request, if there is one
      */
     public function serve(Element $element, ?string $query = null): bool
@@ -49,6 +54,7 @@ class ServeCacheService extends PageCacheService
 
         $response = Craft::$app->getResponse();
         $response->format = Response::FORMAT_HTML;
+        $response->getHeaders()->set(self::HEADER, 'HIT');
         $response->data = $html;
         Craft::$app->end();
 

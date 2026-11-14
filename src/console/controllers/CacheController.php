@@ -108,6 +108,20 @@ class CacheController extends Controller
         return ExitCode::OK;
     }
 
+    /**
+     * Refresh the pages of entries whose post or expiry date passed since the last check.
+     * Run it with a cron job (e.g. every 5 minutes), site requests only check it every few minutes.
+     *
+     * @return int
+     */
+    public function actionRefreshExpired()
+    {
+        $count = PageCache::$plugin->refreshCacheService->refreshExpired();
+
+        Console::output("Entries with a passed post or expiry date: {$count}");
+        return ExitCode::OK;
+    }
+
     // Private Methods
     // =========================================================================
 

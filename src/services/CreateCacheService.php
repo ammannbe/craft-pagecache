@@ -26,7 +26,7 @@ class CreateCacheService extends PageCacheService
 {
     private function getFooter(): string
     {
-        return '<!-- Cached by Page Cache at ' . gmdate('Y-m-d\TH:i:s') . ' -->';
+        return '<!-- Cached by Page Cache at ' . gmdate('Y-m-d\TH:i:s\Z') . ' -->';
     }
 
     /**
@@ -85,15 +85,30 @@ class CreateCacheService extends PageCacheService
         return true;
     }
 
+    /**
+     * Generate the cache of all pages (warm up), existing caches stay until they are replaced
+     */
     public function create($siteId = null, bool $queue = true): ?bool
     {
-        $entries = Entry::find()
+        $rows = Entry::find()
             ->siteId($siteId ?? '*')
             ->uri(':notempty:')
-            ->collect()
-            ->filter(fn (Entry $entry) => $entry->getUrl());
+            ->select(['elements.id', 'elements_sites.siteId', 'elements_sites.uri'])
+            ->asArray()
+            ->all();
 
-        $this->pushToQueue($entries->all());
+        $pages = [];
+        foreach ($rows as $row) {
+            $url = '/' . trim(str_replace(Element::HOMEPAGE_URI, '', (string) $row['uri']), '/');
+            $pages["{$row['siteId']}:{$url}"] = [
+                'siteId' => (int) $row['siteId'],
+                'url' => $url,
+                'elementId' => (int) $row['id'],
+                'delete' => false,
+            ];
+        }
+
+        $this->queuePages($pages);
 
         return true;
     }
@@ -123,6 +138,12 @@ class CreateCacheService extends PageCacheService
         $pageCacheRecord->elementId = $element->id;
         $pageCacheRecord->tags = $this->parsePageCacheMetaTag('tags', $html);
 
-        return $pageCacheRecord->save();
+        if (!$pageCacheRecord->save()) {
+            return false;
+        }
+
+        PageCache::$plugin->trackingService->save((int) $pageCacheRecord->id);
+
+        return true;
     }
 }

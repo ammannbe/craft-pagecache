@@ -18,8 +18,12 @@ use craft\db\ActiveRecord;
  * @since     1.2.0
  *
  * @property  int $id
- * @property  string $element serialized craft\base\Element
- * @property  string $url
+ * @property  int|null $elementId
+ * @property  int|null $siteId
+ * @property  string|null $url Path with query string (e.g. "/news?page=2"), null for an element check
+ * @property  string $urlHash
+ * @property  bool $delete Only delete the cache, don't generate it again
+ * @property  bool $check Find the pages whose element queries match the element
  */
 class PageCacheQueueRecord extends ActiveRecord
 {

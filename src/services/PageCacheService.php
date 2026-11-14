@@ -15,17 +15,18 @@ use suhype\pagecache\PageCache;
 
 use Craft;
 use craft\base\Element;
-use craft\helpers\Json;
+use craft\db\Query;
+use yii\db\IntegrityException;
+use craft\helpers\Db;
 use craft\helpers\Queue;
 use craft\models\Site;
 use craft\base\Component;
 use craft\elements\Entry;
 use craft\queue\Queue as CraftQueue;
-use craft\queue\QueueInterface;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
+use suhype\pagecache\db\Table;
 use suhype\pagecache\jobs\PageCacheTask;
-use suhype\pagecache\records\PageCacheQueueRecord;
 use suhype\pagecache\records\PageCacheRecord;
 
 /**
@@ -35,6 +36,26 @@ use suhype\pagecache\records\PageCacheRecord;
  */
 class PageCacheService extends Component
 {
+    /**
+     * Query parameter with which the queue job requests a page to generate its cache
+     */
+    public const GENERATE_PARAM = 'pagecache-generate';
+
+    /**
+     * Header with the secret token of the queue job requests
+     */
+    public const GENERATE_HEADER = 'X-Page-Cache-Generate';
+
+    /**
+     * Cache key of the waiting queue job ID
+     */
+    public const JOB_CACHE_KEY = 'pagecache:jobId';
+
+    /**
+     * Shared by all service instances, flash messages are removed while rendering
+     */
+    private static ?bool $hasFlashMessages = null;
+
     public function __construct()
     {
         $this->enabled = PageCache::$plugin->settings->enabled;
@@ -151,6 +172,7 @@ class PageCacheService extends Component
     {
         // Also matches JSON encoded URLs ("assets\/generate-transform")
         if (str_contains($html, 'assets/generate-transform') || str_contains($html, 'assets\/generate-transform')) {
+            PageCache::$plugin->diagnosticsService->addNotice(DiagnosticsService::NOTICE_TRANSFORMS);
             return false;
         }
 
@@ -161,10 +183,12 @@ class PageCacheService extends Component
         // A static CSRF token belongs to the visitor who rendered the page, every other visitor's
         // form submission would fail. Use {{ csrfInput({ async: true }) }} instead.
         if ($this->containsStaticCsrfToken($html)) {
+            $url = PageCache::$plugin->diagnosticsService->currentUrl();
             Craft::warning(
-                'Page Cache did not cache "' . Craft::$app->getRequest()->getFullPath() . '", it contains a static CSRF token. Use `csrfInput({ async: true })`.',
+                "Page Cache did not cache \"{$url}\", it uses a CSRF token. Use `csrfInput({ async: true })`.",
                 __METHOD__
             );
+            PageCache::$plugin->diagnosticsService->addNotice(DiagnosticsService::NOTICE_CSRF, $url);
 
             return false;
         }
@@ -325,111 +349,301 @@ class PageCacheService extends Component
     }
 
     /**
+     * Cached variants of the page of $element (query strings), without the page itself
+     *
      * @return array<PageCacheRecord>
      */
     protected function getPageCacheQueryRecords(Element $element): array
     {
-        $url = $this->parseUrl($element);
-
         return PageCacheRecord::find()
-            ->where(['like', 'url', addcslashes($url, '%_\\') . '?%', false])
-            ->andWhere(['siteId' => $element->getSite()->id])
+            ->where([
+                'elementId' => $element->id,
+                'siteId' => $element->getSite()->id,
+            ])
+            ->andWhere(['not', ['url' => $this->parseUrl($element)]])
             ->all();
     }
 
-    protected function getQueueUrl(Element $element): ?string
+    /**
+     * The page of $element and its cached variants
+     *
+     * @return array<string, array{siteId: int, url: string, elementId: int|null, delete: bool}>
+     */
+    protected function getPagesForElement(Element $element, bool $delete = false): array
     {
-        $baseUrl = $element->getSite()->getBaseUrl();
-        $uri = Craft::$app->elements->getElementUriForSite($element->id, $element->siteId);
+        $siteId = (int) $element->getSite()->id;
+        $pages = [];
 
-        if ($baseUrl === null || !is_string($uri)) {
-            return null;
+        $url = $this->parseUrl($element);
+        $pages["{$siteId}:{$url}"] = [
+            'siteId' => $siteId,
+            'url' => $url,
+            'elementId' => (int) $element->id,
+            'delete' => $delete,
+        ];
+
+        foreach ($this->getPageCacheQueryRecords($element) as $record) {
+            $pages["{$siteId}:{$record->url}"] = [
+                'siteId' => $siteId,
+                'url' => $record->url,
+                'elementId' => (int) $element->id,
+                'delete' => $delete,
+            ];
         }
 
-        return str_replace(Element::HOMEPAGE_URI, '', $baseUrl . $uri);
+        return $pages;
+    }
+
+    /**
+     * @param iterable<PageCacheRecord> $records
+     * @return array<string, array{siteId: int, url: string, elementId: int|null, delete: bool}>
+     */
+    protected function getPagesForRecords(iterable $records): array
+    {
+        $pages = [];
+
+        foreach ($records as $record) {
+            $pages["{$record->siteId}:{$record->url}"] = [
+                'siteId' => (int) $record->siteId,
+                'url' => $record->url,
+                'elementId' => $record->elementId ? (int) $record->elementId : null,
+                'delete' => false,
+            ];
+        }
+
+        return $pages;
     }
 
     /**
      * Push $elements to queue
      *
+     * @deprecated since 2.3.0 - use RefreshCacheService::refreshForElements()
      * @param array<Element|null> $elements
      */
     protected function pushToQueue(array $elements): void
     {
-        $elements = array_filter($elements);
-        if (empty($elements)) {
-            return;
+        $pages = [];
+        foreach (array_filter($elements) as $element) {
+            $pages += $this->getPagesForElement($element);
         }
 
-        $queue = Craft::$app->getQueue();
-        if (!$queue || !($queue instanceof QueueInterface)) {
-            return;
+        $this->queuePages($pages);
+    }
+
+    public function queuePages(array $pages, bool $ensureJob = true): void
+    {
+        $rows = [];
+        foreach ($pages as $page) {
+            $hash = md5("{$page['siteId']}:{$page['url']}");
+            $rows[$hash] = [
+                'elementId' => $page['elementId'],
+                'siteId' => $page['siteId'],
+                'url' => $page['url'],
+                'urlHash' => $hash,
+                'delete' => (bool) $page['delete'],
+                'check' => false,
+                'claimed' => false,
+            ];
         }
 
-        $queuedUrls = array_flip(PageCacheQueueRecord::find()->select('url')->column());
+        $this->insertQueueRows($rows);
 
-        foreach ($elements as $element) {
-            $url = $this->getQueueUrl($element);
-            if ($url === null || isset($queuedUrls[$url])) {
-                continue;
-            }
-
-            // Only store the reference: serializing the whole element walks all nested
-            // Matrix/Neo field values recursively and can hang the save request.
-            $elementReference = Json::encode([
-                'id' => $element->id,
-                'siteId' => $element->siteId,
-            ]);
-
-            foreach ($this->getPageCacheQueryRecords($element) as $queryRecord) {
-                if (isset($queuedUrls[$queryRecord->url])) {
-                    continue;
-                }
-
-                $pageCacheQueueRecord = new PageCacheQueueRecord([
-                    'element' => $elementReference,
-                    'url'     => $queryRecord->url,
-                    'delete'  => true,
-                ]);
-                $pageCacheQueueRecord->save();
-                $queuedUrls[$queryRecord->url] = true;
-            }
-
-            $pageCacheQueueRecord = new PageCacheQueueRecord([
-                'element' => $elementReference,
-                'url'     => $url,
-                'delete'  => false,
-            ]);
-            $pageCacheQueueRecord->save();
-            $queuedUrls[$url] = true;
-        }
-
-        if (!$this->hasPendingPageCacheTask($queue)) {
-            Queue::push(new PageCacheTask());
+        if ($ensureJob && !empty($rows)) {
+            $this->ensureQueueJob();
         }
     }
 
-    protected function hasPendingPageCacheTask(QueueInterface $queue): bool
+    /**
+     * Let the queue job find the pages whose element queries match the elements (e.g. listings)
+     *
+     * @param array<Element> $elements
+     */
+    public function queueElementChecks(array $elements, bool $ensureJob = true): void
     {
-        foreach ($queue->getJobInfo() as $job) {
-            // A failed task never runs again, so it must not block a new one
-            if (($job['status'] ?? null) === CraftQueue::STATUS_FAILED) {
+        $rows = [];
+        foreach ($elements as $element) {
+            // The queries are site specific already, one check per element is enough
+            $hash = md5("check:{$element->id}");
+            $rows[$hash] = [
+                'elementId' => (int) $element->id,
+                'siteId' => (int) $element->siteId,
+                'url' => null,
+                'urlHash' => $hash,
+                'delete' => false,
+                'check' => true,
+                'claimed' => false,
+            ];
+        }
+
+        $this->insertQueueRows($rows);
+
+        if ($ensureJob && !empty($rows)) {
+            $this->ensureQueueJob();
+        }
+    }
+
+    /**
+     * Insert new rows, mark existing ones as unclaimed again: a job that is processing them right now
+     * then keeps them and processes them once more, so a change during the job is never lost.
+     *
+     * @param array<string, array> $rows keyed by hash
+     */
+    private function insertQueueRows(array $rows): void
+    {
+        if (empty($rows)) {
+            return;
+        }
+
+        foreach (array_chunk($rows, 500, true) as $chunk) {
+            $existing = (new Query())
+                ->select(['urlHash'])
+                ->from(Table::QUEUE)
+                ->where(['urlHash' => array_keys($chunk)])
+                ->column();
+
+            if (!empty($existing)) {
+                Db::update(Table::QUEUE, ['claimed' => false], ['urlHash' => $existing]);
+
+                // Deleting wins over refreshing (e.g. an entry got disabled while it waited in the queue)
+                $toDelete = array_keys(array_filter(array_intersect_key($chunk, array_flip($existing)), fn($row) => $row['delete']));
+                if (!empty($toDelete)) {
+                    Db::update(Table::QUEUE, ['delete' => true], ['urlHash' => $toDelete]);
+                }
+            }
+
+            $chunk = array_diff_key($chunk, array_flip($existing));
+            if (empty($chunk)) {
                 continue;
             }
+
+            $columns = array_keys(reset($chunk));
 
             try {
-                $jobDetails = $queue->getJobDetails($job['id']);
-            } catch (\Throwable $e) {
-                // The job finished in the meantime
-                continue;
+                Db::batchInsert(Table::QUEUE, $columns, array_map('array_values', array_values($chunk)));
+            } catch (IntegrityException $e) {
+                // Another request queued one of the pages in the meantime. Not possible on PostgreSQL inside
+                // a transaction, so elements are only flushed early outside of transactions.
+                foreach ($chunk as $row) {
+                    try {
+                        Db::insert(Table::QUEUE, $row);
+                    } catch (IntegrityException $e) {
+                        Db::update(Table::QUEUE, ['claimed' => false], ['urlHash' => $row['urlHash']]);
+                    }
+                }
             }
+        }
+    }
 
-            if (($jobDetails['job'] ?? null) instanceof PageCacheTask) {
-                return true;
+    /**
+     * Push a queue job, unless one is waiting already. A running job also processes pages queued
+     * while it runs, but it forgets its ID when it starts, so a page queued at its very end gets a new job.
+     */
+    public function ensureQueueJob(?int $delay = null): void
+    {
+        $queue = Craft::$app->getQueue();
+        $cache = Craft::$app->getCache();
+        $jobId = $cache->get(self::JOB_CACHE_KEY);
+
+        if ($jobId) {
+            try {
+                if ($queue->status($jobId) === CraftQueue::STATUS_WAITING) {
+                    return;
+                }
+            } catch (\Throwable $e) {
             }
         }
 
-        return false;
+        $jobId = Queue::push(new PageCacheTask(), null, $delay);
+        if ($jobId) {
+            $cache->set(self::JOB_CACHE_KEY, $jobId, 86400);
+        }
+    }
+
+    /**
+     * Full URL the queue job requests to generate a page. The query parameter makes the rewrite rules
+     * skip the cached file, the secret token is sent as header (see getGenerateHeaders()), so it never
+     * shows up in the HTML (e.g. pagination links) or in logs.
+     */
+    public function getGenerateUrl(Site $site, string $url): ?string
+    {
+        $baseUrl = $site->getBaseUrl();
+        if ($baseUrl === null) {
+            return null;
+        }
+
+        $url = rtrim($baseUrl, '/') . '/' . ltrim($url, '/');
+
+        return $url . (str_contains($url, '?') ? '&' : '?') . self::GENERATE_PARAM . '=1';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getGenerateHeaders(): array
+    {
+        return [self::GENERATE_HEADER => $this->getGenerateToken()];
+    }
+
+    public function getGenerateToken(): string
+    {
+        return hash_hmac('sha256', 'pagecache-generate', Craft::$app->getConfig()->getGeneral()->securityKey);
+    }
+
+    /**
+     * Whether the current request was sent by the queue job to generate the page
+     */
+    public function isGenerateRequest(): bool
+    {
+        $token = Craft::$app->getRequest()->getHeaders()->get(self::GENERATE_HEADER);
+
+        return is_string($token) && hash_equals($this->getGenerateToken(), $token);
+    }
+
+    /**
+     * Remove the generate parameter from the current request, so it never ends up in the rendered HTML
+     * (e.g. pagination links or canonical URLs) nor in the cache path
+     */
+    public function stripGenerateParam(): void
+    {
+        $request = Craft::$app->getRequest();
+        $params = $request->getQueryParams();
+
+        if (!array_key_exists(self::GENERATE_PARAM, $params)) {
+            return;
+        }
+
+        unset($params[self::GENERATE_PARAM], $_GET[self::GENERATE_PARAM]);
+        $request->setQueryParams($params);
+
+        // String based, so the order and encoding of the other parameters stay as they are
+        $strip = fn(string $query) => implode('&', array_filter(
+            explode('&', $query),
+            fn(string $part) => $part !== '' && $part !== self::GENERATE_PARAM && !str_starts_with($part, self::GENERATE_PARAM . '=')
+        ));
+
+        if (isset($_SERVER['QUERY_STRING'])) {
+            $_SERVER['QUERY_STRING'] = $strip((string) $_SERVER['QUERY_STRING']);
+        }
+
+        // request.url / request.absoluteUrl (e.g. og:url, canonical)
+        [$path, $query] = explode('?', $request->getUrl(), 2) + [1 => ''];
+        $query = $strip($query);
+        $url = $path . ($query !== '' ? "?{$query}" : '');
+        $_SERVER['REQUEST_URI'] = $url;
+        $request->setUrl($url);
+    }
+
+    /**
+     * Query string of the current request
+     */
+    public function getRequestQueryString(): ?string
+    {
+        return (string) Craft::$app->getRequest()->getQueryStringWithoutPath();
+    }
+
+    public function isLive(Element $element): bool
+    {
+        return in_array($element->getStatus(), [Entry::STATUS_LIVE, Element::STATUS_ENABLED], true);
     }
 
     /**
@@ -526,7 +740,38 @@ class PageCacheService extends Component
         }
 
         // Logged-in users may see personalized content
-        return Craft::$app->getUser()->getIsGuest();
+        if (!Craft::$app->getUser()->getIsGuest()) {
+            return false;
+        }
+
+        // A flash message (e.g. "Thank you for your message") must neither end up in the cache for everyone,
+        // nor be hidden by a cached page
+        return !$this->hasFlashMessages();
+    }
+
+    /**
+     * Whether the visitor has flash messages. Checked once before rendering, which removes them from the session.
+     */
+    protected function hasFlashMessages(): bool
+    {
+        if (self::$hasFlashMessages !== null) {
+            return self::$hasFlashMessages;
+        }
+
+        $session = Craft::$app->getSession();
+
+        // Don't start a session for visitors without one
+        if (!$session->getIsActive() && !isset($_COOKIE[$session->getName()])) {
+            return self::$hasFlashMessages = false;
+        }
+
+        try {
+            // Read the flash counters directly: getAllFlashes() would mark the messages for deletion
+            $session->open();
+            return self::$hasFlashMessages = !empty($_SESSION[$session->flashParam] ?? []);
+        } catch (\Throwable $e) {
+            return self::$hasFlashMessages = false;
+        }
     }
 
     public function createCacheFolder()
@@ -584,6 +829,16 @@ class PageCacheService extends Component
             }
         };
 
+        // Nested elements (e.g. Matrix entries) are shown on the page of their owner
+        if (!$element->uri) {
+            $addEntry($element);
+        }
+
+        // Dependency tracking knows every page that shows the element, also through relations
+        if (PageCache::$plugin->settings->trackDependencies) {
+            return $entries;
+        }
+
         foreach (Entry::find()->relatedTo($element)->siteId($element->siteId)->all() as $relatedEntry) {
             $addEntry($relatedEntry);
         }
@@ -600,12 +855,29 @@ class PageCacheService extends Component
             }
         }
 
-        // Nested elements (e.g. Matrix entries) are shown on the page of their owner
-        if (!$element->uri) {
-            $addEntry($element);
-        }
-
         return $entries;
+    }
+
+    /**
+     * When the page of $element was cached, null if it is not cached
+     */
+    public function getCachedAt(Element $element): ?\DateTime
+    {
+        $path = $this->parsePath($element);
+        $time = $path !== null && is_file($path) ? @filemtime($path) : false;
+
+        return $time ? (new \DateTime())->setTimestamp($time) : null;
+    }
+
+    /**
+     * Whether the page of $element waits in the queue
+     */
+    public function isQueued(Element $element): bool
+    {
+        return (new Query())
+            ->from(Table::QUEUE)
+            ->where(['urlHash' => md5($element->getSite()->id . ':' . $this->parseUrl($element))])
+            ->exists();
     }
 
     public function isCached(Element $element)

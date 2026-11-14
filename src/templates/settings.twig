@@ -1,65 +1,73 @@
-{# @var craft \craft\web\twig\variables\CraftVariable #}
+{# @var settings \suhype\pagecache\models\Settings #}
 {#
 /**
  * Page Cache plugin for Craft CMS
  *
- * Simple HTML Page Cache Plugin
+ * Settings, grouped in tabs (see _settings/page.twig). Settings from config/pagecache.php are locked.
  *
- * @link      https://github.com/ammannbe
- * @copyright Copyright (c) 2022 Benjamin Ammann
+ * @link      https://github.com/ammannbe/craft-pagecache
  */
 #}
 
 {% import "_includes/forms" as forms %}
 
-<p>
-    {{ "Note: You can't make changes, if the config file exists!"|t('pagecache') }}
-</p>
+{% set overrides = overrides ?? [] %}
 
-{{ craft.cp.field(forms.lightswitch({
+{# Settings from config/pagecache.php are locked #}
+{% macro field(key, input, config, overrides) %}
+    {{ craft.cp.field(input, config|merge({
+        id: key,
+        name: key,
+        warning: key in overrides ? 'Set with `{key}` in `config/pagecache.php`, it can’t be changed here.'|t('pagecache', { key: key }) : null,
+    }))|raw }}
+{% endmacro %}
+
+{% set siteOptions = [{ value: '', label: 'All sites'|t('pagecache') }]
+    |merge(craft.app.sites.getAllSites()|map(site => { value: site.id, label: site.name })) %}
+
+{# Same layout as the info of the utility actions: mode in bold, one paragraph each #}
+{% set refreshModeInfo = ['clearAndGenerate', 'expireAndGenerate', 'clear']
+    |map(mode => '<strong>' ~ ('refreshMode.' ~ mode)|t('pagecache')|e ~ ':</strong> ' ~ ('refreshMode.' ~ mode ~ '.info')|t('pagecache')|e)
+    |join('<br><br>') %}
+
+{# General #}
+<div id="pagecache-general">
+    {{ _self.field('enabled', forms.lightswitch({
         id: 'enabled',
         name: 'enabled',
-        on: settings['enabled'],
+        on: settings.enabled,
+        disabled: 'enabled' in overrides,
     }), {
         label: 'Enabled caching'|t('pagecache'),
-        id: 'enabled',
-        name: 'enabled'
-})|raw }}
+    }, overrides) }}
 
-{{ craft.cp.field(forms.lightswitch({
-        id: 'gzip',
-        name: 'gzip',
-        on: settings['gzip'],
+    {{ _self.field('refreshMode', forms.select({
+        id: 'refreshMode',
+        name: 'refreshMode',
+        options: [
+            { value: 'clearAndGenerate', label: 'refreshMode.clearAndGenerate'|t('pagecache') },
+            { value: 'expireAndGenerate', label: 'refreshMode.expireAndGenerate'|t('pagecache') },
+            { value: 'clear', label: 'refreshMode.clear'|t('pagecache') },
+        ],
+        value: settings.refreshMode,
+        disabled: 'refreshMode' in overrides,
     }), {
-        label: 'Enable gzip compression'|t('pagecache'),
-        id: 'gzip',
-        name: 'gzip'
-})|raw }}
+        label: ('Refresh mode'|t('pagecache')|e) ~ ' ' ~ tag('span', { class: 'info', html: refreshModeInfo }),
+        instructions: 'What happens with the cache of a page when its content changes.'|t('pagecache'),
+    }, overrides) }}
 
-{{ craft.cp.field(forms.lightswitch({
-        id: 'brotli',
-        name: 'brotli',
-        on: settings['brotli'],
+    {{ _self.field('trackDependencies', forms.lightswitch({
+        id: 'trackDependencies',
+        name: 'trackDependencies',
+        on: settings.trackDependencies,
+        disabled: 'trackDependencies' in overrides,
     }), {
-        label: 'Enable brotli compression'|t('pagecache'),
-        info: 'NOTE: the brotli extension must be installed',
-        id: 'brotli',
-        name: 'brotli'
-})|raw }}
+        label: 'Track dependencies'|t('pagecache'),
+        instructions: 'Remember which entries, assets and element queries a page uses, so it is refreshed when one of them changes (e.g. a news listing when a news entry is saved).'|t('pagecache'),
+    }, overrides) }}
 
-{{ craft.cp.field(forms.lightswitch({
-        id: 'cacheQueryStrings',
-        name: 'cacheQueryStrings',
-        on: settings['cacheQueryStrings'],
-    }), {
-        label: 'Cache pages with query strings'|t('pagecache'),
-        instructions: "Every query string creates its own cache file. Included URL's are always cached."|t('pagecache'),
-        id: 'cacheQueryStrings',
-        name: 'cacheQueryStrings'
-})|raw }}
-
-{% set globalSaveAction =settings['globalSaveAction'] == 'recreate' ? 'refresh' : settings['globalSaveAction'] %}
-{{ craft.cp.field(forms.select({
+    {% set globalSaveAction = settings.globalSaveAction == 'recreate' ? 'refresh' : settings.globalSaveAction %}
+    {{ _self.field('globalSaveAction', forms.select({
         id: 'globalSaveAction',
         name: 'globalSaveAction',
         options: [
@@ -67,81 +75,160 @@
             { value: 'delete', label: 'Delete cache'|t('pagecache') },
         ],
         value: globalSaveAction,
+        disabled: 'globalSaveAction' in overrides,
     }), {
         label: 'When globals are saved'|t('pagecache'),
-        id: 'globalSaveAction',
-        name: 'globalSaveAction'
-})|raw }}
+    }, overrides) }}
 
-{{ craft.cp.field(forms.editableTable({
-        label: "Excluded URL's"|t('pagecache'),
-        id: 'excludedUrls',
-        name: 'excludedUrls',
-        cols: {
-            siteId: {
-                heading: 'Site'|t('pagecache'),
-                type: "select",
-                options: [{ value: '', label: 'All sites'|t('pagecache') }]
-                    |merge(craft.app.sites.getAllSites()
-                    |map(site => {
-                        value: site.id,
-                        label: site.name
-                    })),
-                thin: true,
-            },
-            path: {
-                heading: "Excluded URL's"|t('pagecache'),
-                type: "singleline"
-            },
-        },
-        rows: settings['excludedUrls'],
-        allowAdd: true,
-        allowReorder: true,
-        allowDelete: true,
+    {{ _self.field('showInCpNav', forms.lightswitch({
+        id: 'showInCpNav',
+        name: 'showInCpNav',
+        on: settings.showInCpNav,
+        disabled: 'showInCpNav' in overrides,
     }), {
-        label: "Excluded URL's"|t('pagecache'),
-})|raw }}
+        label: 'Show in the main navigation'|t('pagecache'),
+        instructions: 'The Page Cache utility (Utilities → Page Cache) is also shown in the main navigation.'|t('pagecache'),
+    }, overrides) }}
 
-{{ craft.cp.field(forms.editableTable({
-        label: "Included URL's"|t('pagecache'),
-        id: 'includedUrls',
-        name: 'includedUrls',
-        cols: {
-            siteId: {
-                heading: 'Site'|t('pagecache'),
-                type: "select",
-                options: [{ value: '', label: 'All sites'|t('pagecache') }]
-                    |merge(craft.app.sites.getAllSites()
-                    |map(site => {
-                        value: site.id,
-                        label: site.name
-                    })),
-                thin: true,
-            },
-            path: {
-                heading: "Included URL's"|t('pagecache'),
-                type: "singleline"
-            },
-        },
-        rows: settings['includedUrls'],
-        allowAdd: true,
-        allowReorder: true,
-        allowDelete: true,
+    {{ _self.field('showRefreshInCpNav', forms.lightswitch({
+        id: 'showRefreshInCpNav',
+        name: 'showRefreshInCpNav',
+        on: settings.showRefreshInCpNav,
+        disabled: 'showRefreshInCpNav' in overrides,
     }), {
-        label: "Included URL's"|t('pagecache'),
-})|raw }}
+        label: 'Show “Refresh cache” in the main navigation'|t('pagecache'),
+        instructions: 'Refreshes all cached pages with one click (e.g. in the refresh mode “Keep until generated again”).'|t('pagecache'),
+    }, overrides) }}
+</div>
 
-{{ craft.cp.field(forms.autosuggest({
+{# Which pages are cached #}
+<div id="pagecache-pages" class="hidden">
+    {{ _self.field('cacheQueryStrings', forms.lightswitch({
+        id: 'cacheQueryStrings',
+        name: 'cacheQueryStrings',
+        on: settings.cacheQueryStrings,
+        disabled: 'cacheQueryStrings' in overrides,
+    }), {
+        label: 'Cache pages with query strings'|t('pagecache'),
+        instructions: "Every query string creates its own cache file. Included URL's are always cached."|t('pagecache'),
+    }, overrides) }}
+
+    {% for key in ['excludedUrls', 'includedUrls'] %}
+        {% set label = key == 'excludedUrls' ? "Excluded URL's"|t('pagecache') : "Included URL's"|t('pagecache') %}
+        {# Locked and empty: say so, a static table without rows shows nothing #}
+        {{ _self.field(key, key in overrides and attribute(settings, key) is empty ? tag('p', { class: 'light', text: 'No URL’s set.'|t('pagecache') }) : forms.editableTable({
+            id: key,
+            name: key,
+            cols: {
+                siteId: {
+                    heading: 'Site'|t('pagecache'),
+                    type: 'select',
+                    options: siteOptions,
+                    thin: true,
+                },
+                path: {
+                    heading: label,
+                    type: 'singleline',
+                    code: true,
+                },
+            },
+            rows: attribute(settings, key),
+            allowAdd: true,
+            allowReorder: true,
+            allowDelete: true,
+            static: key in overrides,
+        }), {
+            label: label,
+            instructions: key == 'excludedUrls'
+                ? 'Never cached. Regular expressions are possible, `#` is the delimiter (e.g. `^news/archive`).'|t('pagecache')
+                : "Always cached, even with a query string. Overrides the excluded URL's."|t('pagecache'),
+        }, overrides) }}
+    {% endfor %}
+</div>
+
+{# Cache files #}
+<div id="pagecache-files" class="hidden">
+    {{ _self.field('cacheFolderPath', forms.autosuggest({
         id: 'cacheFolderPath',
         name: 'cacheFolderPath',
-        value: settings['cacheFolderPath'],
-        required: true,
+        value: settings.cacheFolderPath,
         suggestEnvVars: true,
         suggestAliases: true,
+        disabled: 'cacheFolderPath' in overrides,
     }), {
         label: 'Cache folder path'|t('pagecache'),
-        id: 'cacheFolderPath',
-        name: 'cacheFolderPath',
+        instructions: 'Must be a dedicated folder, the rewrite rules expect `@webroot/pagecache`.'|t('pagecache'),
         required: true,
-})|raw }}
+    }, overrides) }}
 
+    {{ _self.field('gzip', forms.lightswitch({
+        id: 'gzip',
+        name: 'gzip',
+        on: settings.gzip,
+        disabled: 'gzip' in overrides,
+    }), {
+        label: 'Enable gzip compression'|t('pagecache'),
+        instructions: 'Also stores a `.gz` file, which the rewrite rules can serve.'|t('pagecache'),
+    }, overrides) }}
+
+    {{ _self.field('brotli', forms.lightswitch({
+        id: 'brotli',
+        name: 'brotli',
+        on: settings.brotli,
+        disabled: 'brotli' in overrides,
+    }), {
+        label: 'Enable brotli compression'|t('pagecache'),
+        instructions: 'Also stores a `.br` file. Requires the PHP brotli extension.'|t('pagecache'),
+    }, overrides) }}
+</div>
+
+{# Queue job #}
+<div id="pagecache-generate" class="hidden">
+    {{ _self.field('generateConcurrency', forms.text({
+        id: 'generateConcurrency',
+        name: 'generateConcurrency',
+        type: 'number',
+        min: 1,
+        size: 5,
+        value: settings.generateConcurrency,
+        disabled: 'generateConcurrency' in overrides,
+    }), {
+        label: 'Concurrent requests'|t('pagecache'),
+        instructions: 'How many pages the queue job requests at the same time.'|t('pagecache'),
+    }, overrides) }}
+
+    {{ _self.field('generateTimeout', forms.text({
+        id: 'generateTimeout',
+        name: 'generateTimeout',
+        type: 'number',
+        min: 1,
+        size: 5,
+        value: settings.generateTimeout,
+        disabled: 'generateTimeout' in overrides,
+    }), {
+        label: 'Timeout per page (seconds)'|t('pagecache'),
+    }, overrides) }}
+
+    {{ _self.field('generateUsername', forms.autosuggest({
+        id: 'generateUsername',
+        name: 'generateUsername',
+        value: settings.generateUsername,
+        suggestEnvVars: true,
+        disabled: 'generateUsername' in overrides,
+    }), {
+        label: 'Basic auth username'|t('pagecache'),
+        instructions: 'If the site is protected with basic auth (e.g. staging), the queue job needs it to request the pages.'|t('pagecache'),
+    }, overrides) }}
+
+    {{ _self.field('generatePassword', forms.autosuggest({
+        id: 'generatePassword',
+        name: 'generatePassword',
+        value: settings.generatePassword,
+        suggestEnvVars: true,
+        disabled: 'generatePassword' in overrides,
+    }), {
+        label: 'Basic auth password'|t('pagecache'),
+        instructions: 'Use an environment variable (e.g. `$BASIC_AUTH_PASSWORD`), so the password is not stored in the project config.'|t('pagecache'),
+        errors: settings.getErrors('generatePassword'),
+    }, overrides) }}
+</div>

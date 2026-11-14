@@ -37,6 +37,19 @@ use suhype\pagecache\services\CreateCacheService;
 use suhype\pagecache\services\DeleteCacheService;
 use suhype\pagecache\services\RefreshCacheService;
 use suhype\pagecache\services\ServeCacheService;
+use suhype\pagecache\services\TrackingService;
+use suhype\pagecache\services\DiagnosticsService;
+use suhype\pagecache\services\TemplateAuditService;
+use suhype\pagecache\utilities\PageCacheUtility;
+use suhype\pagecache\mcp\PageCacheCapabilities;
+use craft\events\RegisterComponentTypesEvent;
+use craft\events\RegisterCpNavItemsEvent;
+use craft\services\Utilities;
+use craft\events\RegisterUrlRulesEvent;
+use craft\web\UrlManager;
+use craft\web\twig\variables\Cp;
+use yii\base\Application as YiiApplication;
+use yii\queue\Queue as YiiQueue;
 use suhype\pagecache\variables\PageCacheVariable;
 
 /**
@@ -51,6 +64,9 @@ use suhype\pagecache\variables\PageCacheVariable;
  * @property  CreateCacheService $createCacheService
  * @property  RefreshCacheService $refreshCacheService
  * @property  ServeCacheService $serveCacheService
+ * @property  TrackingService $trackingService
+ * @property  DiagnosticsService $diagnosticsService
+ * @property  TemplateAuditService $templateAuditService
  */
 class PageCache extends Plugin
 {
@@ -68,7 +84,7 @@ class PageCache extends Plugin
     /**
      * @var string
      */
-    public string $schemaVersion = '1.2.3';
+    public string $schemaVersion = '1.3.0';
 
     /**
      * @var bool
@@ -152,7 +168,10 @@ class PageCache extends Plugin
                     'pagecache/_sidebar/element',
                     [
                         'entry' => $entry,
+                        'enabled' => $this->settings->enabled,
                         'isCached' => $this->pageCacheService->isCached($entry),
+                        'cachedAt' => $this->pageCacheService->getCachedAt($entry),
+                        'isQueued' => $this->pageCacheService->isQueued($entry),
                     ]
                 );
             },
@@ -217,33 +236,21 @@ class PageCache extends Plugin
                     $this->deleteCacheService->deleteForUriChange($previous);
                 }
 
-                $activeStates = [
-                    Entry::STATUS_LIVE,
-                    Element::STATUS_ENABLED,
-                ];
+                // Processed once at the end of the request, saving an entry also saves all its nested entries
+                $this->refreshCacheService->elementChanged($savedElement);
+            }
+        );
 
-                $elements = $this->pageCacheService->getRelatedElements($savedElement);
-                $elements[$savedElement->id] = $savedElement;
-
-                $toDelete = [];
-                $toRefresh = [];
-
-                foreach ($elements as $element) {
-                    // The owner of a nested element can be in a bulk resave as well
-                    if (!$element->uri || ElementHelper::isDraftOrRevision($element) || $element->resaving) {
-                        continue;
-                    }
-
-                    if (!in_array($element->getStatus(), $activeStates)) {
-                        $toDelete[$element->id] = $element;
-                        continue;
-                    }
-
-                    $toRefresh[$element->id] = $element;
+        Event::on(
+            Elements::class,
+            Elements::EVENT_BEFORE_DELETE_ELEMENT,
+            function (Event $event) {
+                if (ElementHelper::isDraftOrRevision($event->element)) {
+                    return;
                 }
 
-                $this->deleteCacheService->deleteForElementWithQuery($toDelete);
-                $this->refreshCacheService->refreshForElements($toRefresh);
+                // Pages that showed the element, before a hard delete removes the tracking rows
+                $this->refreshCacheService->elementChanged($event->element, true);
             }
         );
 
@@ -251,7 +258,7 @@ class PageCache extends Plugin
             Elements::class,
             Elements::EVENT_AFTER_DELETE_ELEMENT,
             function (Event $event) {
-                if (!$event->element->uri) {
+                if (!$event->element->uri || ElementHelper::isDraftOrRevision($event->element)) {
                     return;
                 }
 
@@ -287,6 +294,122 @@ class PageCache extends Plugin
         );
     }
 
+    private function _registerFlushEvents(): void
+    {
+        $flush = function () {
+            // The changes are saved already, a failing refresh must not show an error page to the editor
+            try {
+                $this->refreshCacheService->flush();
+            } catch (\Throwable $e) {
+                Craft::error('Page Cache could not refresh the changed pages: ' . $e->getMessage(), __METHOD__);
+            }
+        };
+
+        // Entries change status without being saved when their post or expiry date passes
+        if (Craft::$app->getRequest()->getIsSiteRequest()) {
+            Event::on(YiiApplication::class, YiiApplication::EVENT_AFTER_REQUEST, function () {
+                try {
+                    $this->refreshCacheService->refreshExpiredIfDue();
+                } catch (\Throwable $e) {
+                    Craft::error('Page Cache could not check expired entries: ' . $e->getMessage(), __METHOD__);
+                }
+            });
+        }
+
+        // Web and console requests
+        Event::on(YiiApplication::class, YiiApplication::EVENT_AFTER_REQUEST, $flush);
+
+        // Queue workers (queue/listen) never end their request, e.g. elements saved by an import job
+        Event::on(YiiQueue::class, YiiQueue::EVENT_AFTER_EXEC, $flush);
+        Event::on(YiiQueue::class, YiiQueue::EVENT_AFTER_ERROR, $flush);
+    }
+
+    private function _registerUtility(): void
+    {
+        Event::on(
+            Utilities::class,
+            Utilities::EVENT_REGISTER_UTILITIES,
+            function (RegisterComponentTypesEvent $event) {
+                $event->types[] = PageCacheUtility::class;
+            }
+        );
+
+        // Own page for the main navigation, with the same content as the utility
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_CP_URL_RULES,
+            function (RegisterUrlRulesEvent $event) {
+                $event->rules['pagecache'] = 'pagecache/utility/index';
+                // Fallback of the "Refresh cache" navigation item without JavaScript
+                $event->rules['pagecache/refresh'] = 'pagecache/utility/index';
+            }
+        );
+
+        Event::on(
+            Cp::class,
+            Cp::EVENT_REGISTER_CP_NAV_ITEMS,
+            function (RegisterCpNavItemsEvent $event) {
+                if (!Craft::$app->getUser()->checkPermission('utility:' . PageCacheUtility::id())) {
+                    return;
+                }
+
+                if ($this->settings->showInCpNav) {
+                    $event->navItems[] = [
+                        'url' => 'pagecache',
+                        'label' => Craft::t('pagecache', 'Page Cache'),
+                        'icon' => '@suhype/pagecache/icon-mask.svg',
+                        'badgeCount' => PageCacheUtility::badgeCount(),
+                    ];
+                }
+
+                if ($this->settings->showRefreshInCpNav) {
+                    $event->navItems[] = [
+                        'url' => 'pagecache/refresh',
+                        'label' => Craft::t('pagecache', 'Refresh cache'),
+                        'icon' => 'arrows-rotate',
+                    ];
+
+                    // Navigation items are links (Craft adds ?site=…), the refresh is a POST request
+                    Craft::$app->getView()->registerJs(<<<JS
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('#nav-pagecache-refresh-link, a[href*="/pagecache/refresh"]');
+    if (!link) {
+        return;
+    }
+    event.preventDefault();
+    if (link.classList.contains('loading')) {
+        return;
+    }
+    link.classList.add('loading');
+    Craft.sendActionRequest('POST', 'pagecache/utility/refresh')
+        .then(({ data }) => Craft.cp.displayNotice(data.message))
+        .catch(({ response }) => Craft.cp.displayError(response?.data?.message))
+        .finally(() => link.classList.remove('loading'));
+});
+JS);
+                }
+            }
+        );
+    }
+
+    /**
+     * Tools for Craft's MCP server (Craft 5.12+)
+     */
+    private function _registerMcp(): void
+    {
+        if (!class_exists(\craft\services\Mcp::class) || !class_exists(\Mcp\Capability\Attribute\McpTool::class)) {
+            return;
+        }
+
+        Event::on(
+            \craft\services\Mcp::class,
+            \craft\services\Mcp::EVENT_REGISTER_CAPABILITY_TYPES,
+            function (RegisterComponentTypesEvent $event) {
+                $event->types[] = PageCacheCapabilities::class;
+            }
+        );
+    }
+
     private function _registerClearCaches(): void
     {
         Event::on(
@@ -317,8 +440,59 @@ class PageCache extends Plugin
     {
         return Craft::$app->view->renderTemplate(
             'pagecache/settings',
-            ['settings' => $this->getSettings()]
+            [
+                'settings' => $this->getSettings(),
+                'overrides' => $this->getConfigOverrides(),
+            ]
         );
+    }
+
+    /**
+     * Settings set in config/pagecache.php, they can't be changed in the control panel
+     *
+     * @return array<string>
+     */
+    public function getConfigOverrides(): array
+    {
+        return array_keys(Craft::$app->getConfig()->getConfigFromFile($this->handle));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getSettingsResponse(): mixed
+    {
+        return $this->renderSettingsPage(false);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getReadOnlySettingsResponse(): mixed
+    {
+        return $this->renderSettingsPage(true);
+    }
+
+    /**
+     * Like the default settings page, with tabs
+     */
+    private function renderSettingsPage(bool $readOnly): mixed
+    {
+        $view = Craft::$app->getView();
+        $settingsHtml = $view->namespaceInputs(function () use ($readOnly) {
+            return $readOnly
+                ? (string) \craft\helpers\Html::disableInputs(fn() => $this->settingsHtml())
+                : (string) $this->settingsHtml();
+        }, 'settings');
+
+        /** @var \craft\web\Controller $controller */
+        $controller = Craft::$app->controller;
+
+        return $controller->renderTemplate('pagecache/_settings/page', [
+            'plugin' => $this,
+            'settingsHtml' => $settingsHtml,
+            'readOnly' => $readOnly,
+        ]);
     }
 
     // Public Methods
@@ -338,6 +512,9 @@ class PageCache extends Plugin
             'refreshCacheService' => RefreshCacheService::class,
             'deleteCacheService' => DeleteCacheService::class,
             'serveCacheService' => ServeCacheService::class,
+            'trackingService' => TrackingService::class,
+            'diagnosticsService' => DiagnosticsService::class,
+            'templateAuditService' => TemplateAuditService::class,
         ]);
 
         if (Craft::$app instanceof ConsoleApplication) {
@@ -345,13 +522,25 @@ class PageCache extends Plugin
         }
 
         if (Craft::$app->request->getIsSiteRequest()) {
+            // Before anything is rendered, so the parameter never ends up in links or in the cache path
+            $this->pageCacheService->stripGenerateParam();
+
             Event::on(
                 Application::class,
                 Application::EVENT_INIT,
                 function () {
                     $element = Craft::$app->getUrlManager()->getMatchedElement();
-                    if ($element && $element->uri) {
-                        $this->serveCacheService->serve($element, Craft::$app->request->getQueryStringWithoutPath());
+                    if (!$element || !$element->uri) {
+                        return;
+                    }
+
+                    // The queue job generates the page, it must not get the old cache
+                    if (!$this->pageCacheService->isGenerateRequest()) {
+                        $this->serveCacheService->serve($element, $this->pageCacheService->getRequestQueryString());
+                    }
+
+                    if ($this->settings->enabled && $this->pageCacheService->isCacheableRequest()) {
+                        $this->trackingService->start();
                     }
                 }
             );
@@ -362,6 +551,9 @@ class PageCache extends Plugin
         $this->_registerElementEvents();
         $this->_registerActionEvents();
         $this->_registerClearCaches();
+        $this->_registerFlushEvents();
+        $this->_registerUtility();
+        $this->_registerMcp();
 
         if (Craft::$app->request->getIsSiteRequest()) {
             Event::on(
@@ -383,7 +575,7 @@ class PageCache extends Plugin
                         return;
                     }
 
-                    $this->createCacheService->createFromSiteRequest($element, Craft::$app->request->getQueryStringWithoutPath(), $event->output);
+                    $this->createCacheService->createFromSiteRequest($element, $this->pageCacheService->getRequestQueryString(), $event->output);
                 }
             );
         }

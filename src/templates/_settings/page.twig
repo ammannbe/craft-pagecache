@@ -1,0 +1,43 @@
+{# Plugin settings page with tabs (like settings/plugins/_settings.twig, which has no tabs) #}
+{% requireAdmin false %}
+
+{% extends "_layouts/cp" %}
+{% set title = plugin.name %}
+{% set docTitle = title ~ ' - ' ~ "Plugins"|t('app') %}
+{% set readOnly = readOnly ?? false %}
+{% set fullPageForm = not readOnly %}
+
+{% set crumbs = [
+    { label: "Settings"|t('app'), url: url('settings') },
+    { label: "Plugins"|t('app'), url: url('settings/plugins') }
+] %}
+
+{# Inputs are namespaced with "settings", so are the IDs of the tab panes #}
+{% set tabs = {
+    general: { label: 'General'|t('pagecache'), url: '#settings-pagecache-general' },
+    pages: { label: 'Pages'|t('pagecache'), url: '#settings-pagecache-pages' },
+    files: { label: 'Cache files'|t('pagecache'), url: '#settings-pagecache-files' },
+    generate: { label: 'Generating pages'|t('pagecache'), url: '#settings-pagecache-generate' },
+} %}
+
+{% set formActions = [
+    {
+        label: 'Save and continue editing'|t('app'),
+        redirect: "settings/plugins/#{plugin.handle}"|hash,
+        shortcut: true,
+        retainScroll: true,
+    },
+] %}
+
+{% if readOnly %}
+    {% set contentNotice = readOnlyNotice() %}
+{% endif %}
+
+{% block content %}
+    {% if not readOnly %}
+        {{ actionInput('plugins/save-plugin-settings') }}
+        {{ hiddenInput('pluginHandle', plugin.handle) }}
+        {{ redirectInput('settings') }}
+    {% endif %}
+    {{ settingsHtml|raw }}
+{% endblock %}

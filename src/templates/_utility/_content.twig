@@ -1,0 +1,345 @@
+{% import '_includes/forms' as forms %}
+
+{% set siteOptions = [{ value: '', label: 'All sites'|t('pagecache') }]|merge(sites|map(site => { value: site.id, label: site.name })) %}
+{% set redirect = craft.app.request.pathInfo %}
+{% do view.registerTranslations('pagecache', ['Copied to the clipboard.']) %}
+
+<div id="pagecache-utility">
+
+    {% if not (layoutTabs ?? false) %}
+        {# Same tabs as on settings pages; on the own page, the layout shows them #}
+        <div class="pagecache-tabs-header">
+            {% include '_includes/tabs' with {
+                containerAttributes: { id: 'pagecache-tabs' },
+                tabs: pagecacheTabs,
+                tablistLabel: 'Page Cache'|t('pagecache'),
+            } %}
+        </div>
+    {% endif %}
+
+    <div id="pagecache-overview">
+
+    {# Notices and improvement suggestions #}
+    <h2>{{ 'Notices'|t('pagecache') }}</h2>
+    {% if notices is empty %}
+        <p class="pagecache-ok">{{ iconSvg('circle-check') }} {{ 'Everything looks fine.'|t('pagecache') }}</p>
+    {% else %}
+        {% for notice in notices %}
+            <div class="pagecache-notice pagecache-notice--{{ notice.level }}" data-pagecache-notice="{{ notice.key }}">
+                <span class="pagecache-notice__icon" aria-hidden="true">{{ iconSvg(notice.level == 'warning' ? 'triangle-exclamation' : 'circle-info') }}</span>
+                <div class="pagecache-notice__body">
+                    <p>{{ notice.message|md(inlineOnly=true) }}</p>
+                    {% if notice.urls ?? false %}
+                        <ul class="bullets">
+                            {% for url in notice.urls %}
+                                <li><a href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if notice.tab ?? false %}
+                        <p><a class="go" href="#pagecache-{{ notice.tab }}" data-pagecache-tab-link="pagecache-{{ notice.tab }}">{{ notice.link.label }}</a></p>
+                    {% elseif notice.link ?? false %}
+                        <p><a class="go" href="{{ notice.link.url }}"{% if not (notice.link.url starts with craft.app.request.hostInfo) %} target="_blank" rel="noopener"{% endif %}>{{ notice.link.label }}</a></p>
+                    {% endif %}
+                </div>
+                <button type="button" class="pagecache-notice__close" data-pagecache-dismiss title="{{ 'Dismiss'|t('app') }}" aria-label="{{ 'Dismiss'|t('app') }}">{{ iconSvg('xmark') }}</button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <hr>
+
+    {# Overview, updated every few seconds #}
+    <h2>{{ 'Overview'|t('pagecache') }}</h2>
+    <table class="data fullwidth" data-pagecache-stats>
+        <tbody>
+            <tr>
+                <th>{{ 'Refresh mode'|t('pagecache') }}</th>
+                <td>{{ ('refreshMode.' ~ settings.refreshMode)|t('pagecache') }}</td>
+            </tr>
+            {% for row in stats.sites %}
+                <tr>
+                    <th>{{ 'Cached pages'|t('pagecache') }}{% if stats.sites|length > 1 %} ({{ row.site }}){% endif %}</th>
+                    <td data-pagecache-stat="site-{{ row.id }}">{{ row.pages|number }}</td>
+                </tr>
+            {% endfor %}
+            <tr>
+                <th>{{ 'Pages in the queue'|t('pagecache') }}</th>
+                <td><span data-pagecache-stat="queued">{{ stats.queued|number }}</span><span data-pagecache-stat-wrap="checks" class="light{{ not stats.checks ? ' hidden' }}"> (+ {{ 'Elements to check'|t('pagecache') }}: <span data-pagecache-stat="checks">{{ stats.checks|number }}</span>)</span></td>
+            </tr>
+            {% if settings.trackDependencies %}
+                <tr>
+                    <th>{{ 'Tracked elements / element queries'|t('pagecache') }}</th>
+                    <td><span data-pagecache-stat="elements">{{ stats.tracking.elements|number }}</span> / <span data-pagecache-stat="queries">{{ stats.tracking.queries|number }}</span></td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <hr>
+
+    {# Actions for the whole cache #}
+    <h2 class="flex gap-xs">
+        {{ 'Actions'|t('pagecache') }}
+        <span class="info">
+            <strong>{{ 'Refresh cache'|t('pagecache') }}:</strong> {{ 'Renews all cached pages depending on the refresh mode.'|t('pagecache') }}<br><br>
+            <strong>{{ 'Cache all pages'|t('pagecache') }}:</strong> {{ 'Caches every page with a URL, also pages nobody visited yet. Existing caches stay until they are replaced.'|t('pagecache') }}<br><br>
+            <strong>{{ 'Delete cache'|t('pagecache') }}:</strong> {{ 'Deletes all cached pages right away. Visitors get the live pages until they are cached again.'|t('pagecache') }}
+        </span>
+    </h2>
+
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ redirectInput(redirect) }}
+
+        {% if sites|length > 1 %}
+            {{ forms.selectField({
+                label: 'Site'|t('pagecache'),
+                name: 'siteId',
+                options: siteOptions,
+            }) }}
+        {% endif %}
+
+        <div class="flex flex-wrap gap-s">
+            <button type="submit" class="btn" name="action" value="pagecache/utility/refresh">{{ 'Refresh cache'|t('pagecache') }}</button>
+            <button type="submit" class="btn" name="action" value="pagecache/utility/warm">{{ 'Cache all pages'|t('pagecache') }}</button>
+            <button type="submit" class="btn caution" name="action" value="pagecache/utility/clear">{{ 'Delete cache'|t('pagecache') }}</button>
+        </div>
+    </form>
+
+    <hr>
+
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ redirectInput(redirect) }}
+        {{ actionInput('pagecache/utility/refresh-urls') }}
+
+        {{ forms.textareaField({
+            label: 'Refresh pages by URL'|t('pagecache'),
+            instructions: 'One full URL per line.'|t('pagecache'),
+            name: 'urls',
+            rows: 4,
+            placeholder: siteUrl('example'),
+            class: 'code',
+        }) }}
+
+        <button type="submit" class="btn">{{ 'Refresh pages'|t('pagecache') }}</button>
+    </form>
+
+    <hr>
+
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ redirectInput(redirect) }}
+        {{ actionInput('pagecache/utility/refresh') }}
+
+        {{ forms.textField({
+            label: 'Refresh pages by tag'|t('pagecache'),
+            instructions: 'Comma separated, see `craft.pagecache.tags()` in the README.'|t('pagecache'),
+            name: 'tags',
+            placeholder: 'news, events',
+        }) }}
+
+        <button type="submit" class="btn">{{ 'Refresh pages'|t('pagecache') }}</button>
+    </form>
+    </div>
+
+    {# Template optimizations #}
+    <div id="pagecache-templates" class="hidden">
+        <div class="flex flex-wrap gap-s" style="margin-bottom: var(--l);">
+            <button type="button" class="btn" data-pagecache-rescan>{{ 'Check templates again'|t('pagecache') }}</button>
+            {% if combinedPrompt %}
+                <button type="button" class="btn" data-pagecache-copy="pagecache-prompt-all">{{ iconSvg('copy') }} {{ 'Copy AI prompt for all'|t('pagecache') }}</button>
+                <textarea id="pagecache-prompt-all" class="hidden" readonly>{{ combinedPrompt }}</textarea>
+            {% endif %}
+        </div>
+        <p class="light">{{ 'Templates in `templates/` are checked (refreshed hourly), pages are added while they are rendered. The AI prompts can be pasted into a coding assistant (e.g. Claude Code, Cursor, Copilot) in the project.'|t('pagecache')|md(inlineOnly=true) }}</p>
+
+        {% if findings is empty %}
+            <p class="pagecache-ok">{{ iconSvg('circle-check') }} {{ 'No template optimizations found.'|t('pagecache') }}</p>
+        {% endif %}
+
+        {% for finding in findings %}
+            <div class="pagecache-notice pagecache-notice--{{ finding.level }} pagecache-finding">
+                <span class="pagecache-notice__icon" aria-hidden="true">{{ iconSvg(finding.level == 'warning' ? 'triangle-exclamation' : 'lightbulb') }}</span>
+                <div class="pagecache-notice__body">
+                    <h3>{{ finding.title|md(inlineOnly=true) }}</h3>
+                    <p>{{ finding.description|md(inlineOnly=true) }}</p>
+                    <p><strong>{{ 'How to fix'|t('pagecache') }}:</strong> {{ finding.fix|md(inlineOnly=true) }}</p>
+                    {% if finding.files %}
+                        <ul class="pagecache-finding__files">
+                            {% for match in finding.files %}
+                                <li><code>{{ match.file }}:{{ match.line }}</code> <span class="light code">{{ match.code }}</span></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if finding.urls %}
+                        <ul class="bullets">
+                            {% for url in finding.urls %}
+                                {% set href = url|split(' (')|first %}
+                                <li><a href="{{ href }}" target="_blank" rel="noopener">{{ url }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    <div class="flex flex-wrap gap-s">
+                        <button type="button" class="btn small" data-pagecache-copy="pagecache-prompt-{{ loop.index }}">{{ iconSvg('copy') }} {{ 'Copy AI prompt'|t('pagecache') }}</button>
+                        {% if finding.docs %}
+                            <a class="go" href="{{ finding.docs }}" target="_blank" rel="noopener">{{ 'Documentation'|t('pagecache') }}</a>
+                        {% endif %}
+                    </div>
+                    <details>
+                        <summary class="light">{{ 'Show AI prompt'|t('pagecache') }}</summary>
+                        <textarea id="pagecache-prompt-{{ loop.index }}" class="text fullwidth code" rows="10" readonly>{{ finding.prompt }}</textarea>
+                    </details>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% css %}
+    #pagecache-utility .pagecache-ok { display: flex; align-items: center; gap: var(--xs); color: var(--success-color); }
+    #pagecache-utility .pagecache-ok svg { width: 16px; height: 16px; fill: currentColor; }
+    #pagecache-utility .pagecache-notice { position: relative; display: flex; gap: var(--s); max-width: 60rem; margin-bottom: var(--m); padding: var(--m) calc(var(--xl) + var(--s)) var(--m) var(--m); border-radius: var(--large-border-radius); border: 1px solid var(--hairline-color); border-inline-start-width: 4px; background: var(--gray-050); }
+    #pagecache-utility .pagecache-notice--warning { border-inline-start-color: var(--warning-color); }
+    #pagecache-utility .pagecache-notice--info { border-inline-start-color: var(--notice-color, var(--link-color)); }
+    #pagecache-utility .pagecache-notice__icon svg { width: 18px; height: 18px; fill: currentColor; }
+    #pagecache-utility .pagecache-notice--warning .pagecache-notice__icon { color: var(--warning-color); }
+    #pagecache-utility .pagecache-notice--info .pagecache-notice__icon { color: var(--notice-color, var(--link-color)); }
+    #pagecache-utility .pagecache-notice__body > * + * { margin-top: var(--xs); }
+    #pagecache-utility .pagecache-notice__body p { margin: 0; }
+    #pagecache-utility .pagecache-notice__close { position: absolute; inset-block-start: var(--s); inset-inline-end: var(--s); display: flex; padding: var(--xs); border-radius: var(--small-border-radius); color: var(--medium-text-color); cursor: pointer; background: none; }
+    #pagecache-utility .pagecache-notice__close:hover { color: var(--text-color); background: var(--gray-100); }
+    #pagecache-utility .pagecache-notice__close svg { width: 14px; height: 14px; fill: currentColor; }
+    #pagecache-utility .pagecache-tabs-header .pane-tabs { margin-inline: 0; }
+    #pagecache-utility .pagecache-tabs-header { margin-bottom: var(--xl); border-bottom: 1px solid var(--hairline-color); border-radius: var(--large-border-radius) var(--large-border-radius) 0 0; background: var(--gray-050); }
+    #pagecache-utility .pagecache-finding { padding-inline-end: var(--m); }
+    #pagecache-utility .pagecache-finding h3 { margin: 0; }
+    #pagecache-utility .pagecache-finding__files { margin: 0; padding: 0; list-style: none; }
+    #pagecache-utility .pagecache-finding__files li { overflow-wrap: anywhere; }
+    #pagecache-utility .btn svg { width: 14px; height: 14px; fill: currentColor; margin-inline-end: var(--xs); }
+    #pagecache-utility details textarea { margin-top: var(--xs); font-size: 12px; }
+{% endcss %}
+
+{% js %}
+(() => {
+    const $root = document.getElementById('pagecache-utility');
+    if (!$root) {
+        return;
+    }
+
+    // Tabs: own tab bar in the utility, the layout tabs on the own page
+    const $tabBar = document.getElementById('pagecache-tabs');
+
+    // Tab bar edge to edge like the layout tabs: pull it over the padding of the content pane
+    const $header = $root.querySelector('.pagecache-tabs-header');
+    const $pane = $root.parentElement;
+    if ($header && $pane) {
+        const style = getComputedStyle($pane);
+        $header.style.margin = `-${style.paddingTop} -${style.paddingRight} ${getComputedStyle($header).marginBottom} -${style.paddingLeft}`;
+    }
+
+    const tabs = $tabBar ? new Craft.Tabs($($tabBar)) : null;
+    const tabLink = (id) => document.querySelector(`#pagecache-tabs a[data-id="${id}"], #tabs a[data-id="${id}"]`);
+    // Craft.Tabs only marks the tab, the panes are toggled here (the layout tabs do it themselves)
+    const showPane = (id) => {
+        $root.querySelectorAll('#pagecache-overview, #pagecache-templates').forEach(($pane) => {
+            $pane.classList.toggle('hidden', $pane.id !== id);
+        });
+        const $scrollable = $tabBar?.querySelector('[role="tablist"]');
+        if ($scrollable) {
+            $scrollable.scrollLeft = 0;
+        }
+    };
+    if (tabs) {
+        tabs.on('selectTab', (ev) => showPane(ev.$tab.data('id')));
+    }
+    const selectTab = (id) => {
+        const $link = tabLink(id);
+        if (!$link) {
+            return;
+        }
+        if (tabs) {
+            tabs.selectTab($($link));
+            showPane(id);
+        } else {
+            $link.click();
+        }
+        sessionStorage.setItem('pagecache-tab', id);
+    };
+    document.querySelectorAll('#pagecache-tabs a[data-id], #tabs a[data-id^="pagecache-"]').forEach(($link) => {
+        $link.addEventListener('click', () => sessionStorage.setItem('pagecache-tab', $link.dataset.id));
+    });
+    $root.querySelectorAll('[data-pagecache-tab-link]').forEach(($link) => {
+        $link.addEventListener('click', (e) => {
+            e.preventDefault();
+            selectTab($link.dataset.pagecacheTabLink);
+        });
+    });
+    // Keep the selected tab after reloads (e.g. "Check templates again")
+    const wanted = location.hash.replace('#', '') || sessionStorage.getItem('pagecache-tab');
+    if (wanted && wanted !== 'pagecache-overview') {
+        selectTab(wanted);
+    }
+
+    $root.querySelector('[data-pagecache-rescan]')?.addEventListener('click', (e) => {
+        e.currentTarget.classList.add('loading');
+        Craft.sendActionRequest('POST', 'pagecache/utility/rescan-templates').then(() => {
+            sessionStorage.setItem('pagecache-tab', 'pagecache-templates');
+            location.reload();
+        });
+    });
+
+    // Copy AI prompts
+    $root.querySelectorAll('[data-pagecache-copy]').forEach(($button) => {
+        $button.addEventListener('click', () => {
+            const text = document.getElementById($button.dataset.pagecacheCopy).value;
+            navigator.clipboard.writeText(text).then(
+                () => Craft.cp.displayNotice(Craft.t('pagecache', 'Copied to the clipboard.')),
+                () => Craft.cp.displayError()
+            );
+        });
+    });
+
+    // Dismiss a notice until its content changes
+    $root.querySelectorAll('[data-pagecache-dismiss]').forEach(($button) => {
+        $button.addEventListener('click', () => {
+            const $notice = $button.closest('[data-pagecache-notice]');
+            Craft.sendActionRequest('POST', 'pagecache/utility/dismiss-notice', {
+                data: { key: $notice.dataset.pagecacheNotice },
+            }).then(() => $notice.remove());
+        });
+    });
+
+    // Keep the overview up to date while the page is open
+    const set = (name, value) => {
+        const $el = $root.querySelector(`[data-pagecache-stat="${name}"]`);
+        if ($el) {
+            $el.textContent = Craft.formatNumber(value);
+        }
+    };
+
+    const update = () => {
+        if (document.hidden || !document.body.contains($root)) {
+            return;
+        }
+
+        Craft.sendActionRequest('GET', 'pagecache/utility/stats').then(({ data }) => {
+            data.sites.forEach((site) => set(`site-${site.id}`, site.pages));
+            set('queued', data.queued);
+            set('checks', data.checks);
+            set('elements', data.tracking.elements);
+            set('queries', data.tracking.queries);
+            $root.querySelector('[data-pagecache-stat-wrap="checks"]')?.classList.toggle('hidden', !data.checks);
+        }).catch(() => {});
+    };
+
+    const interval = setInterval(() => {
+        if (!document.body.contains($root)) {
+            clearInterval(interval);
+            return;
+        }
+        update();
+    }, 5000);
+})();
+{% endjs %}

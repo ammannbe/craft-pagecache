@@ -7,15 +7,21 @@
             <div class="heading">
                 <label>{{- "Status"|t('site') -}}</label>
             </div>
-            <div class="input ltr flex gap-xs">
-                <span class="flex gap-xs {{ not isCached ? 'hidden' }}" data-pagecache-status="cached">
-                    <span>{{- "Page is cached"|t('pagecache') }}</span>
+            <div class="input ltr flex flex-col gap-xs" style="align-items: flex-start;">
+                <span class="flex gap-xs {{ not isCached ? 'hidden' }}" data-pagecache-status="cached"{% if cachedAt %} title="{{ cachedAt|datetime('short') }}"{% endif %}>
+                    <span>{{- "Page is cached"|t('pagecache') }}{% if cachedAt %} <span class="light">({{ cachedAt|timestamp('short') }})</span>{% endif %}</span>
                     <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg></span>
                 </span>
                 <span class="flex gap-xs {{ isCached ? 'hidden' }}" data-pagecache-status="not-cached">
                     <span>{{- "Page is not cached"|t('pagecache') }}</span>
                     <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-x-icon lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
                 </span>
+                {% if isQueued %}
+                    <span class="light">{{ "In the queue"|t('pagecache') }}</span>
+                {% endif %}
+                {% if not enabled %}
+                    <span class="light">{{ "Caching is disabled"|t('pagecache') }}</span>
+                {% endif %}
             </div>
         </div>
 
