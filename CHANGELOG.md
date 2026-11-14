@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.3.0 - 2026-11-14
+
+### Added
+
+- Setting "Refresh mode" (`refreshMode`): clear the cache right away and generate it again (default), keep it until it is generated again, or clear it only
+- Dependency tracking (`trackDependencies`, on by default): pages remember the elements and element queries they use and are refreshed when one of them changes, e.g. a listing when a new entry is published or a navigation entry changes
+- Page Cache utility with dismissible notices and improvement suggestions (with documentation links), a live overview and actions (refresh, cache or delete all pages, refresh by URL or tag); optionally as its own page in the main navigation (`showInCpNav`)
+- Optional “Refresh cache” item in the main navigation (`showRefreshInCpNav`)
+- Template optimizations in the utility: template patterns and rendered pages that don't work well with a static cache (static CSRF tokens, `{% cache %}`, random content, `now`, pagination, `Cache-Control`, pending image transforms, missing eager loading), with fix and AI prompt
+- Tools for Craft's MCP server (Craft 5.12+): `pagecache_status`, `pagecache_page_status`, `pagecache_refresh`, `pagecache_clear`, `pagecache_warm`
+- Console command `pagecache/cache/refresh-expired`, site requests also check every 5 minutes for entries whose post or expiry date passed
+- Basic auth (`generateUsername`, `generatePassword`), concurrency (`generateConcurrency`) and timeout (`generateTimeout`) settings for the queue job
+- The sidebar shows when a page was cached and whether it is waiting in the queue
+- Cached pages served by the plugin have an `X-Page-Cache: HIT` header
+
+### Fixed
+
+- Pages rendered for a visitor with a flash message (e.g. after submitting a form) were cached with the message for everyone, and such visitors could get a cached page without their message
+
+### Changed
+
+- Settings are grouped in tabs; settings from `config/pagecache.php` are locked and marked, `resources/config/pagecache.php` contains all settings
+- Monochrome icon for the utility and the navigation
+- The timestamp in the HTML comment of cached pages is marked as UTC (`Z`)
+- Changed elements are collected during a request and their pages are queued once at the end (also in queue workers), instead of on every element save
+- Pages are queued with a single database query and only once (unique URL hash), a waiting queue job is found without loading all jobs
+- The queue job processes pages in batches with a constant number of concurrent requests and uses Craft's Guzzle client (`config/guzzle.php`)
+- The queue job requests pages with a `pagecache-generate` parameter and a secret header, so neither the rewrite rules nor the plugin serve the old cache; the parameter is removed before rendering
+- Pages queued again while the job processes them are processed once more, a second job doesn't wait for the running one, and long runs hand over to a new job after 10 minutes
+- Pages the queue job can't generate (error response, timeout) are deleted instead of serving the old version
+- Pages of deleted elements are refreshed if they showed the element
+- The queue table stores element references instead of serialized elements; existing caches are generated again once to track their dependencies
+
 ## 2.2.1 - 2026-11-14
 
 ### Added

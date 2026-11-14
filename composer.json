@@ -2,7 +2,7 @@
     "name": "suhype/craft-pagecache",
     "description": "Simple HTML Page Cache Plugin",
     "type": "craft-plugin",
-    "version": "2.2.1",
+    "version": "2.3.0",
     "keywords": [
         "craft",
         "cms",
@@ -11,7 +11,7 @@
         "page cache"
     ],
     "support": {
-        "docs": "https://github.com/ammannbe/craft-pagecache/blob/master/README.md",
+        "docs": "https://github.com/ammannbe/craft-pagecache/blob/main/README.md",
         "issues": "https://github.com/ammannbe/craft-pagecache/issues"
     },
     "license": "proprietary",
@@ -35,8 +35,8 @@
         "handle": "pagecache",
         "developer": "Benjamin Ammann",
         "developerUrl": "https://github.com/ammannbe",
-        "documentationUrl": "https://github.com/ammannbe/craft-pagecache/blob/master/README.md",
-        "changelogUrl": "https://raw.githubusercontent.com/ammannbe/craft-pagecache/master/CHANGELOG.md",
+        "documentationUrl": "https://github.com/ammannbe/craft-pagecache/blob/main/README.md",
+        "changelogUrl": "https://raw.githubusercontent.com/ammannbe/craft-pagecache/main/CHANGELOG.md",
         "components": {
             "pageCacheService": "suhype\\pagecache\\services\\PageCacheService"
         },
