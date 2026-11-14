@@ -36,7 +36,7 @@ class CacheController extends Controller
     {
         PageCache::$plugin->refreshCacheService->refreshForElements($this->getElement());
 
-        return $this->asSuccess();
+        return $this->asSuccess(Craft::t('pagecache', 'The page cache will be refreshed.'));
     }
 
     /**
@@ -46,7 +46,9 @@ class CacheController extends Controller
     {
         PageCache::$plugin->deleteCacheService->deleteForElementWithQuery($this->getElement());
 
-        return $this->asSuccess();
+        return $this->asSuccess(Craft::t('pagecache', 'The page cache has been deleted.'), [
+            'isCached' => false,
+        ]);
     }
 
     private function getElement(): ElementInterface

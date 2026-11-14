@@ -214,7 +214,7 @@ class PageCache extends Plugin
                 unset($this->previousElements[$key]);
 
                 if ($previous && $previous->uri !== $savedElement->uri) {
-                    $this->deleteCacheService->deleteForElementWithQuery($previous);
+                    $this->deleteCacheService->deleteForUriChange($previous);
                 }
 
                 $activeStates = [
@@ -372,13 +372,14 @@ class PageCache extends Plugin
                         return;
                     }
 
-                    if (!Craft::$app->getResponse()->getIsOk()) {
+                    if (!$this->pageCacheService->isCacheableResponse($event->template)) {
                         return;
                     }
 
                     $element = Craft::$app->getUrlManager()->getMatchedElement();
 
-                    if (!$element) {
+                    // e.g. "news/p2" also matches the element, but must not overwrite the cache of "news"
+                    if (!$element || !$this->pageCacheService->isRequestForElement($element)) {
                         return;
                     }
 

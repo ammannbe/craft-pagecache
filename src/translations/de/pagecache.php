@@ -33,5 +33,7 @@ return [
     'Page is not cached' => 'Seite ist nicht gecached',
     'Cache folder path' => 'Cache Ordner-Pfad',
     'Create cache' => 'Cache erstellen',
+    'The page cache will be refreshed.' => 'Der Page Cache wird erneuert.',
+    'The page cache has been deleted.' => 'Der Page Cache wurde gelöscht.',
     'Actions' => 'Aktionen',
 ];

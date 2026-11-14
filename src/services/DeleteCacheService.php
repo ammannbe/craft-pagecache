@@ -85,6 +85,37 @@ class DeleteCacheService extends PageCacheService
     }
 
     /**
+     * Delete the cache of an element whose URI changed (slug or parent), including the pages below it.
+     *
+     * Craft updates the URIs of descendants without saving them, so their cache would stay
+     * at the old URLs.
+     */
+    public function deleteForUriChange(Element $previous): void
+    {
+        $this->deleteForElementWithQuery($previous);
+
+        if (!$previous->uri || $previous->uri === Element::HOMEPAGE_URI) {
+            return;
+        }
+
+        $url = $this->parseUrl($previous);
+        $records = PageCacheRecord::find()
+            ->where(['like', 'url', addcslashes($url, '%_\\') . '/%', false])
+            ->andWhere(['siteId' => $previous->getSite()->id])
+            ->all();
+
+        foreach ($records as $record) {
+            $this->deleteRecord($record);
+        }
+
+        // Also files without record (e.g. after a database import)
+        $path = $this->parsePath($previous);
+        if ($path !== null) {
+            $this->deleteDirectory(dirname($path));
+        }
+    }
+
+    /**
      * Delete complete cache
      */
     public function delete(?int $siteId = null, ?array $tags = null)
@@ -104,8 +135,38 @@ class DeleteCacheService extends PageCacheService
             $query->andWhere(['or', ...$tagsQuery]);
         }
 
-        foreach ($query->all() as $record) {
+        foreach ($query->each() as $record) {
             $this->deleteRecord($record);
         }
+
+        if (!empty($tags)) {
+            return;
+        }
+
+        // Files without record (e.g. after a database import) would be served by the rewrite rules forever
+        if ($siteId === null) {
+            $this->deleteCacheFolderContents();
+            return;
+        }
+
+        $site = Craft::$app->getSites()->getSiteById($siteId, true);
+        $siteDir = $site ? $this->getSiteCacheDir($site) : null;
+        if ($siteDir === null) {
+            return;
+        }
+
+        // Don't delete the folder if another site lives below it (e.g. "example.com" and "example.com/de")
+        foreach (Craft::$app->getSites()->getAllSites(true) as $otherSite) {
+            if ($otherSite->id == $siteId) {
+                continue;
+            }
+
+            $otherDir = $this->getSiteCacheDir($otherSite);
+            if ($otherDir !== null && ($otherDir === $siteDir || str_starts_with($otherDir . '/', $siteDir . '/'))) {
+                return;
+            }
+        }
+
+        $this->deleteDirectory($siteDir);
     }
 }

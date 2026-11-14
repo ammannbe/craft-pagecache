@@ -8,13 +8,14 @@
                 <label>{{- "Status"|t('site') -}}</label>
             </div>
             <div class="input ltr flex gap-xs">
-                {% if isCached %}
+                <span class="flex gap-xs {{ not isCached ? 'hidden' }}" data-pagecache-status="cached">
                     <span>{{- "Page is cached"|t('pagecache') }}</span>
                     <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg></span>
-                {% else %}
+                </span>
+                <span class="flex gap-xs {{ isCached ? 'hidden' }}" data-pagecache-status="not-cached">
                     <span>{{- "Page is not cached"|t('pagecache') }}</span>
                     <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-x-icon lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
-                {% endif %}
+                </span>
             </div>
         </div>
 
@@ -63,8 +64,16 @@
                         entryId: {{ entry.id }},
                         siteId: {{ entry.siteId }},
                     },
-                }).then(() => {
-                    window.location.reload();
+                }).then(({ data }) => {
+                    // No reload: it would discard unsaved changes in the edit form
+                    $button.classList.remove('loading');
+                    $button.disabled = false;
+                    Craft.cp.displayNotice(data.message);
+
+                    if (data.isCached === false) {
+                        $fieldset.querySelector('[data-pagecache-status="cached"]')?.classList.add('hidden');
+                        $fieldset.querySelector('[data-pagecache-status="not-cached"]')?.classList.remove('hidden');
+                    }
                 }).catch(({ response }) => {
                     $button.classList.remove('loading');
                     $button.disabled = false;

@@ -33,6 +33,8 @@ return [
     'Page is not cached' => 'Page is not cached',
     'Cache folder path' => 'Cache folder path',
     'Create cache' => 'Create cache',
+    'The page cache will be refreshed.' => 'The page cache will be refreshed.',
+    'The page cache has been deleted.' => 'The page cache has been deleted.',
     'Actions' => 'Actions',
     'Cache pages with query strings' => 'Cache pages with query strings',
     'Every query string creates its own cache file. Included URL\'s are always cached.' => 'Every query string creates its own cache file. Included URL\'s are always cached.',

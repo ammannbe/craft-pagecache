@@ -158,7 +158,61 @@ class PageCacheService extends Component
             return false;
         }
 
+        // A static CSRF token belongs to the visitor who rendered the page, every other visitor's
+        // form submission would fail. Use {{ csrfInput({ async: true }) }} instead.
+        if ($this->containsStaticCsrfToken($html)) {
+            Craft::warning(
+                'Page Cache did not cache "' . Craft::$app->getRequest()->getFullPath() . '", it contains a static CSRF token. Use `csrfInput({ async: true })`.',
+                __METHOD__
+            );
+
+            return false;
+        }
+
         return true;
+    }
+
+    protected function containsStaticCsrfToken(string $html): bool
+    {
+        $generalConfig = Craft::$app->getConfig()->getGeneral();
+        if (!$generalConfig->enableCsrfProtection) {
+            return false;
+        }
+
+        // The token was used while rendering (csrfInput() without async, craft.app.request.csrfToken in JS, ...)
+        if ($this->csrfTokenWasGenerated()) {
+            return true;
+        }
+
+        $name = preg_quote($generalConfig->csrfTokenName, '/');
+
+        if (!preg_match_all('/<input\b[^>]*\bname=["\']' . $name . '["\'][^>]*>/i', $html, $inputs)) {
+            return false;
+        }
+
+        foreach ($inputs[0] as $input) {
+            if (preg_match('/\bvalue=["\'][^"\']+["\']/i', $input)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether Craft generated a CSRF token in the current request (it is only generated on use)
+     */
+    protected function csrfTokenWasGenerated(): bool
+    {
+        $request = Craft::$app->getRequest();
+
+        try {
+            $property = new \ReflectionProperty(\craft\web\Request::class, '_craftCsrfToken');
+
+            return $property->getValue($request) !== null;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     protected function shouldCache(Element $element, ?string $query, string $html): bool
@@ -212,16 +266,62 @@ class PageCacheService extends Component
         return $path !== null && file_exists($path);
     }
 
-    protected function pageCacheRecordExists(Element $element, ?string $query = null)
+    /**
+     * Cache folder of a site (host plus base path), or null if it can't be resolved
+     */
+    protected function getSiteCacheDir(Site $site): ?string
     {
-        $condition = [
-            'url' => $this->parseUrl($element, $query),
-            'siteId' => $element->getSite()->id,
-        ];
+        $path = $this->parsePathForSite($site, '/');
 
-        return PageCacheRecord::find()
-            ->where($condition)
-            ->exists();
+        return $path === null ? null : rtrim(dirname($path), '/');
+    }
+
+    /**
+     * Whether the cache folder is a dedicated folder that may be deleted recursively
+     */
+    protected function isSafeCacheFolder(): bool
+    {
+        $folder = realpath($this->cacheFolderPath);
+
+        if ($folder === false || $folder === '/' || !is_dir($folder)) {
+            return false;
+        }
+
+        // Never delete a system folder or one of its parents (e.g. when the path is set to @webroot)
+        foreach (['@root', '@webroot', '@storage', '@vendor', '@config', '@templates'] as $alias) {
+            $systemPath = Craft::getAlias($alias, false);
+            $systemPath = $systemPath ? realpath($systemPath) : false;
+
+            if ($systemPath !== false && ($systemPath === $folder || str_starts_with($systemPath . '/', $folder . '/'))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Delete a directory recursively, only if it is inside the cache folder
+     */
+    protected function deleteDirectory(string $dir): void
+    {
+        $folder = realpath($this->cacheFolderPath);
+        $dir = realpath($dir);
+
+        if ($folder === false || $dir === false || !is_dir($dir) || !str_starts_with($dir, $folder . '/') || !$this->isSafeCacheFolder()) {
+            return;
+        }
+
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($files as $fileinfo) {
+            $fileinfo->isDir() && !$fileinfo->isLink() ? @rmdir($fileinfo->getPathname()) : @unlink($fileinfo->getPathname());
+        }
+
+        @rmdir($dir);
     }
 
     /**
@@ -358,6 +458,57 @@ class PageCacheService extends Component
     /**
      * Whether the current request may be served from or written to the cache
      */
+    /**
+     * Whether the current request path is the URI of $element.
+     *
+     * Paginated URLs (e.g. "news/p2") and other paths that resolve to the same element
+     * must not be served from or written to the cache of the element URI.
+     */
+    public function isRequestForElement(Element $element): bool
+    {
+        $request = Craft::$app->getRequest();
+
+        if ($request->getPageNum() !== 1) {
+            return false;
+        }
+
+        $uri = $element->uri === Element::HOMEPAGE_URI ? '' : (string) $element->uri;
+
+        // getPathInfo() strips the site base path and the page trigger ("news/p1" is "news", page 1)
+        return trim($request->getPathInfo(), '/') === trim($uri, '/');
+    }
+
+    /**
+     * Whether the rendered response may be written to the cache
+     */
+    public function isCacheableResponse(?string $template = null): bool
+    {
+        $response = Craft::$app->getResponse();
+
+        if (!$response->getIsOk()) {
+            return false;
+        }
+
+        $headers = $response->getHeaders();
+
+        // Content-Type set by the template ({% header %}), otherwise by the template extension (e.g. sitemap.xml.twig)
+        $contentType = $headers->get('content-type');
+        if ($contentType === null && $template !== null) {
+            try {
+                $templateFile = preg_replace('/\.twig$/i', '', strtolower((string) Craft::$app->getView()->resolveTemplate($template)));
+                $contentType = \craft\helpers\FileHelper::getMimeTypeByExtension($templateFile);
+            } catch (\Throwable $e) {
+                $contentType = null;
+            }
+        }
+
+        $contentType = strtolower(trim(explode(';', (string) ($contentType ?? 'text/html'))[0]));
+
+        // Cache-Control is intentionally ignored: it controls browsers and proxies,
+        // not the page cache. Use {% do craft.pagecache.exclude() %} to exclude a page.
+        return $contentType === 'text/html';
+    }
+
     public function isCacheableRequest(): bool
     {
         $request = Craft::$app->getRequest();
@@ -387,23 +538,40 @@ class PageCacheService extends Component
 
     public function deleteCacheFolder()
     {
-        $dir = $this->cacheFolderPath;
-
-        if (!file_exists($dir)) {
+        if (!file_exists($this->cacheFolderPath)) {
             return;
         }
 
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
-        );
-
-        foreach ($files as $fileinfo) {
-            $todo = ($fileinfo->isDir() ? 'rmdir' : 'unlink');
-            $todo($fileinfo->getRealPath());
+        if (!$this->isSafeCacheFolder()) {
+            Craft::warning(
+                "Page Cache did not delete the cache folder \"{$this->cacheFolderPath}\", it is not a dedicated folder.",
+                __METHOD__
+            );
+            return;
         }
 
-        rmdir($dir);
+        $this->deleteCacheFolderContents();
+        @rmdir($this->cacheFolderPath);
+    }
+
+    /**
+     * Delete all cached files, but keep the cache folder
+     */
+    public function deleteCacheFolderContents(): void
+    {
+        if (!is_dir($this->cacheFolderPath) || !$this->isSafeCacheFolder()) {
+            return;
+        }
+
+        foreach (new \DirectoryIterator($this->cacheFolderPath) as $fileinfo) {
+            if ($fileinfo->isDot()) {
+                continue;
+            }
+
+            $fileinfo->isDir() && !$fileinfo->isLink()
+                ? $this->deleteDirectory($fileinfo->getPathname())
+                : @unlink($fileinfo->getPathname());
+        }
     }
 
     public function getRelatedElements(Element $element)
@@ -442,6 +610,7 @@ class PageCacheService extends Component
 
     public function isCached(Element $element)
     {
-        return $this->pageCacheFileExists($element) || $this->pageCacheRecordExists($element);
+        // A record without file is not served, the file is the source of truth
+        return $this->pageCacheFileExists($element);
     }
 }

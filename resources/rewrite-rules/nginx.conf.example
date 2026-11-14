@@ -1,0 +1,24 @@
+# PageCache rewrites for nginx (inside the server block)
+# Serves cached pages to guests only, logged-in users (Craft session cookie) always get the live page.
+
+set $pagecache_file "";
+
+if ($request_method = GET) {
+    set $pagecache_file "/pagecache/$host$uri/index.html";
+}
+
+if ($args != "") {
+    set $pagecache_file "/pagecache/$host$uri/@$args/index.html";
+}
+
+if ($http_cookie ~* "CraftSessionId") {
+    set $pagecache_file "";
+}
+
+location / {
+    # Serves index.html.gz to clients that support gzip (requires ngx_http_gzip_static_module)
+    gzip_static on;
+    # brotli_static on; # requires ngx_brotli
+
+    try_files $pagecache_file $uri $uri/ /index.php?$query_string;
+}

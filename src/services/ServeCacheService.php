@@ -14,7 +14,6 @@ namespace suhype\pagecache\services;
 use Craft;
 use craft\base\Element;
 use craft\web\Response;
-use suhype\pagecache\PageCache;
 
 /**
  * @author    Benjamin Ammann
@@ -32,6 +31,11 @@ class ServeCacheService extends PageCacheService
             return false;
         }
 
+        // e.g. "news/p2" also matches the element, but must not get the cache of "news"
+        if (!$this->isRequestForElement($element)) {
+            return false;
+        }
+
         if (!$this->shouldCachePage($element, $query)) {
             return false;
         }
@@ -40,8 +44,6 @@ class ServeCacheService extends PageCacheService
         $html = is_file($path) ? @file_get_contents($path) : false;
 
         if ($html === false) {
-            // Remove a record without file, so the page gets cached again
-            PageCache::$plugin->deleteCacheService->deleteForElement($element, $query);
             return false;
         }
 

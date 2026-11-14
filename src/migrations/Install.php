@@ -115,6 +115,7 @@ class Install extends Migration
      */
     protected function removeTables()
     {
+        $this->dropTableIfExists(PageCacheQueueRecord::tableName());
         $this->dropTableIfExists(PageCacheRecord::tableName());
     }
 }

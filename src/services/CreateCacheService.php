@@ -101,7 +101,12 @@ class CreateCacheService extends PageCacheService
     public function createFromSiteRequest(Element $element, ?string $query, string $html): bool
     {
         if (!$this->shouldCache($element, $query, $html)) {
-            PageCache::$plugin->deleteCacheService->deleteForElement($element, $query);
+            // Only touch the file system and database if there is something to remove
+            // (e.g. the page got excluded), not on every request of an uncached page
+            if ($this->pageCacheFileExists($element, $query)) {
+                PageCache::$plugin->deleteCacheService->deleteForElement($element, $query);
+            }
+
             return false;
         }
 
