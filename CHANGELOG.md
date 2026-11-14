@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.3.1 - 2026-11-14
+
+### Fixed
+
+- The settings tabs “Pages”, “Cache files” and “Generating pages” didn’t show their fields when switching tabs (e.g. the URL tables), also when admin changes are disallowed
+
 ## 2.3.0 - 2026-11-14
 
 ### Added
